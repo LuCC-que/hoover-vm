@@ -25,6 +25,8 @@ using syntax::EvaParser;
 #define READ_BYTE() *ip++
 #define STACK_LIMIT 512
 #define GET_CONST() co->constants[READ_BYTE()]
+#define READ_SHORT() (ip += 2, (uint16_t)((ip[-2] << 8) | ip[-1]))
+#define TO_ADDRESS(index) &co->code[index]
 
 #define BINARY_OP(op)                \
     do {                             \

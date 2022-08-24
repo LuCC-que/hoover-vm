@@ -63,9 +63,54 @@ void EvaCompiler::gen(const Exp& exp) {
                     emit(OP_COMPARE);
                     emit(compareOps_[op]);
                 }
+
+                //-------------------------
+                // Branch Instruction:
+
+                if (op == "if") {
+                    gen(exp.list[1]);
+                    emit(OP_JMP_IF_FALSE);
+                    emit(0);
+                    emit(0);
+
+                    auto elseJmpAddr = getOffset() - 2;
+
+                    // Emit <consequent>
+                    gen(exp.list[2]);
+                    emit(OP_JUMP);
+
+                    // 2 - byte address
+                    emit(0);
+                    emit(0);
+
+                    auto endAddr = getOffset() - 2;
+
+                    auto elseBranchAddr = getOffset();
+                    patchJumpAddress(elseJmpAddr, elseBranchAddr);
+
+                    if (exp.list.size() == 4) {
+                        gen(exp.list[3]);
+                    }
+
+                    auto endBranchAddr = getOffset();
+                    patchJumpAddress(endAddr, endBranchAddr);
+                }
             }
             break;
     }
+}
+
+void EvaCompiler::writeByteOffset(size_t offset, uint8_t value) {
+    co->code[offset] = value;
+}
+
+void EvaCompiler::patchJumpAddress(size_t offset, uint16_t value) {
+    writeByteOffset(offset, (value >> 8) & 0xff);
+    writeByteOffset(offset + 1, value & 0xff);
+}
+
+size_t EvaCompiler::getOffset() {
+    return co->code.size();
 }
 
 void EvaCompiler::emit(uint8_t code) {

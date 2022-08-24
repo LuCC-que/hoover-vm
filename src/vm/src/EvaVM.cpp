@@ -97,6 +97,21 @@ EvaValue EvaVM::eval() {
                 break;
             }
 
+            case OP_JMP_IF_FALSE: {
+                auto cond = AS_BOOLEAN(pop());
+                auto address = READ_SHORT();
+
+                if (!cond) {
+                    ip = TO_ADDRESS(address);
+                }
+                break;
+            }
+
+            case OP_JUMP: {
+                ip = TO_ADDRESS(READ_SHORT());
+                break;
+            }
+
             default:
                 DIE << "Unknown Opcode: " << std::hex << opcode;
         }

@@ -32,6 +32,9 @@ class EvaCompiler {
     size_t numericConstIdx(double value);
     size_t stringConstIdx(const std::string& value);
     size_t booleanConstIdx(const bool value);
+    size_t getOffset();
+    void patchJumpAddress(size_t offset, uint16_t value);
+    void writeByteOffset(size_t offset, uint8_t value);
 
    public:
     EvaCompiler(){};
