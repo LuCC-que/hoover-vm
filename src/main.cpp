@@ -8,12 +8,12 @@ int main(int argc, char const *argv[]) {
     EvaVM vm;
     auto result = vm.exec(R"(
 
-    3
+    (if (> 5 10) 1 2)
 
    )");
 
     std::cout << "where?" << std::endl;
-    log(AS_NUMBER(result));
+    log(result);
 
     std::cout << "all passed!" << std::endl;
     return 0;
