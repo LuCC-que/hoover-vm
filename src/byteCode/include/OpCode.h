@@ -1,6 +1,9 @@
 #ifndef OpCode_h
 #define OpCode_h
 
+#include <string>
+
+#include "../../logger/include/Logger.h"
 /**
  * @brief
  * Stops the program
@@ -27,5 +30,31 @@
 #define OP_JMP_IF_FALSE 0x07
 
 #define OP_JUMP 0x08
+
+//#op -> string var
+//##op -> connect var name to others
+
+#define OP_STR(op) \
+    case OP_##op:  \
+        return #op
+
+inline std::string opcodeToString(uint8_t opcode) {
+    switch (opcode) {
+        OP_STR(HALT);
+        OP_STR(CONST);
+        OP_STR(ADD);
+        OP_STR(SUB);
+        OP_STR(MUL);
+        OP_STR(DIV);
+        OP_STR(COMPARE);
+        OP_STR(JMP_IF_FALSE);
+        OP_STR(JUMP);
+
+        default:
+            DIE << "opcodeToString: Unknown opcode: " << (int)opcode;
+    }
+
+    return "UnKnown";
+}
 
 #endif

@@ -5,6 +5,7 @@
 #include <string>
 
 #include "../../byteCode/include/OpCode.h"
+#include "../../disassembler/include/EvaDisassembler.h"
 #include "../../logger/include/Logger.h"
 #include "../../parser/include/EvaParser.h"
 #include "../../vm/include/EvaValue.h"
@@ -35,9 +36,13 @@ class EvaCompiler {
     size_t getOffset();
     void patchJumpAddress(size_t offset, uint16_t value);
     void writeByteOffset(size_t offset, uint8_t value);
+    std::unique_ptr<EvaDisassembler> disassembler;
 
    public:
-    EvaCompiler(){};
+    EvaCompiler()
+        : disassembler(std::make_unique<EvaDisassembler>()){};
+
+    void disassembleByteCode();
 
     CodeObject* compile(const Exp& exp);
 

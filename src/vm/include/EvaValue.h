@@ -1,6 +1,10 @@
 #ifndef EvaValue_h
 #define EvaValue_h
 
+#include <string>
+#include <vector>
+
+#include "../../logger/include/Logger.h"
 /**
  * @brief
  * Eval type

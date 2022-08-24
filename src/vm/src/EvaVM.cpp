@@ -27,13 +27,14 @@ EvaValue EvaVM::exec(const std::string &program) {
     std::cout << "where?" << std::endl;
     sp = &stack[0];
 
+    compiler->disassembleByteCode();
+
     return eval();
 }
 
 EvaValue EvaVM::eval() {
     for (;;) {
         auto opcode = READ_BYTE();
-        log(+opcode);
         switch (opcode) {
             case OP_HALT:
                 return pop();

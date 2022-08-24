@@ -17,9 +17,10 @@ add_subdirectory(vm)
 add_subdirectory(logger)
 add_subdirectory(parser)
 add_subdirectory(compiler)
+add_subdirectory(disassembler)
 
 add_executable(VM main.cpp)
 
 
 
-target_link_libraries(VM PRIVATE vm logger parser compiler)
+target_link_libraries(VM PRIVATE vm logger parser compiler disassembler)

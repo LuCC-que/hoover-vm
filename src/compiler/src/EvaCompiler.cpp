@@ -70,24 +70,29 @@ void EvaCompiler::gen(const Exp& exp) {
                 if (op == "if") {
                     gen(exp.list[1]);
                     emit(OP_JMP_IF_FALSE);
+
+                    // dont know the brach address yet
                     emit(0);
                     emit(0);
 
+                    // record where to save it
                     auto elseJmpAddr = getOffset() - 2;
 
                     // Emit <consequent>
                     gen(exp.list[2]);
                     emit(OP_JUMP);
 
-                    // 2 - byte address
+                    // dont know end address yet
                     emit(0);
                     emit(0);
 
                     auto endAddr = getOffset() - 2;
 
+                    // now see the address, the idx of last element + 1
                     auto elseBranchAddr = getOffset();
                     patchJumpAddress(elseJmpAddr, elseBranchAddr);
 
+                    // put code to that position
                     if (exp.list.size() == 4) {
                         gen(exp.list[3]);
                     }
@@ -132,4 +137,8 @@ size_t EvaCompiler::booleanConstIdx(const bool value) {
     ALLOC_CONST(IS_BOOLEAN, AS_BOOLEAN, BOOLEAN, value);
 
     return co->constants.size() - 1;
+}
+
+void EvaCompiler::disassembleByteCode() {
+    disassembler->disassemble(co);
 }
