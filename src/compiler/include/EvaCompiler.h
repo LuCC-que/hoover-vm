@@ -36,11 +36,13 @@ class EvaCompiler {
     size_t getOffset();
     void patchJumpAddress(size_t offset, uint16_t value);
     void writeByteOffset(size_t offset, uint8_t value);
+    std::shared_ptr<Global> global;
     std::unique_ptr<EvaDisassembler> disassembler;
 
    public:
-    EvaCompiler()
-        : disassembler(std::make_unique<EvaDisassembler>()){};
+    EvaCompiler(std::shared_ptr<Global> global)
+        : global(global),
+          disassembler(std::make_unique<EvaDisassembler>(global)){};
 
     void disassembleByteCode();
 

@@ -20,6 +20,7 @@
 #include "../../compiler/include/EvaCompiler.h"
 #include "../../parser/include/EvaParser.h"
 #include "EvaValue.h"
+#include "Global.h"
 using syntax::EvaParser;
 
 #define READ_BYTE() *ip++
@@ -77,8 +78,20 @@ class EvaVM {
     /* data */
    public:
     EvaVM(/* args */)
-        : parser(std::make_unique<EvaParser>()),
-          compiler(std::make_unique<EvaCompiler>()){};
+        : global(std::make_shared<Global>()),
+          parser(std::make_unique<EvaParser>()),
+          compiler(std::make_unique<EvaCompiler>(global)) {
+        setGlobalVariables();
+    };
+
+    /**
+     * @brief
+     *
+     * @param offset
+     * @return EvaValue
+     */
+    EvaValue peek(size_t offset = 0);
+
     /**
      * @brief
      *
@@ -87,6 +100,8 @@ class EvaVM {
      * pushes a value onto the stack
      */
     void push(const EvaValue &value);
+
+    void setGlobalVariables();
 
     EvaValue pop();
 
@@ -130,6 +145,7 @@ class EvaVM {
      * @brief
      * Parser
      */
+    std::shared_ptr<Global> global;
 
     std::unique_ptr<EvaParser> parser;
 

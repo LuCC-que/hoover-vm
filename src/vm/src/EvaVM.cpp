@@ -113,6 +113,21 @@ EvaValue EvaVM::eval() {
                 break;
             }
 
+            case OP_GET_GLOBAL: {
+                auto globalIndex = READ_BYTE();
+                push(global->get(globalIndex).value);
+                break;
+            }
+
+            case OP_SET_GLOBAL: {
+                auto globalIndex = READ_BYTE();
+                // result on the stack, in this case
+                // usually the top
+                auto value = peek(0);
+                global->set(globalIndex, value);
+                break;
+            }
+
             default:
                 DIE << "Unknown Opcode: " << std::hex << opcode;
         }
@@ -127,6 +142,14 @@ EvaValue EvaVM::pop() {
     return *sp;
 }
 
+EvaValue EvaVM::peek(size_t offset) {
+    if (stack.size() == 0) {
+        DIE << "peek(): empty stack.\n";
+    }
+
+    return *(sp - 1 - offset);
+}
+
 void EvaVM::push(const EvaValue &value) {
     if ((size_t)(sp - stack.begin()) == STACK_LIMIT) {
         std::cout << "test" << std::endl;
@@ -135,4 +158,9 @@ void EvaVM::push(const EvaValue &value) {
 
     *sp = value;
     sp++;
+}
+
+void EvaVM::setGlobalVariables() {
+    global->addConst("x", 10);
+    global->addConst("y", 20);
 }

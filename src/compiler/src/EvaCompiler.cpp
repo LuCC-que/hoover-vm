@@ -25,6 +25,16 @@ void EvaCompiler::gen(const Exp& exp) {
             if (exp.string == "true" || exp.string == "false") {
                 emit(OP_CONST);
                 emit(booleanConstIdx(exp.string == "true" ? true : false));
+            } else {
+                //---------------------------------------------
+                // variable
+
+                if (!global->exists(exp.string)) {
+                    DIE << "[EvaCompiler]: Reference error:" << exp.string;
+                }
+
+                emit(OP_GET_GLOBAL);
+                emit(global->getGlobalIndex(exp.string));
             }
             break;
 
@@ -99,6 +109,17 @@ void EvaCompiler::gen(const Exp& exp) {
 
                     auto endBranchAddr = getOffset();
                     patchJumpAddress(endAddr, endBranchAddr);
+                }
+
+                else if (op == "var") {
+                    // 1 is variable
+                    global->define(exp.list[1].string);
+
+                    // 2 is exp
+                    gen(exp.list[2]);
+
+                    emit(OP_SET_GLOBAL);
+                    emit(global->getGlobalIndex(exp.list[1].string));
                 }
             }
             break;

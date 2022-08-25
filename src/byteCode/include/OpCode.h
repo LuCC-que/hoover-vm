@@ -31,9 +31,12 @@
 
 #define OP_JUMP 0x08
 
+#define OP_GET_GLOBAL 0x09
+
+#define OP_SET_GLOBAL 0x10
+
 //#op -> string var
 //##op -> connect var name to others
-
 #define OP_STR(op) \
     case OP_##op:  \
         return #op
@@ -49,7 +52,8 @@ inline std::string opcodeToString(uint8_t opcode) {
         OP_STR(COMPARE);
         OP_STR(JMP_IF_FALSE);
         OP_STR(JUMP);
-
+        OP_STR(GET_GLOBAL);
+        OP_STR(SET_GLOBAL);
         default:
             DIE << "opcodeToString: Unknown opcode: " << (int)opcode;
     }
