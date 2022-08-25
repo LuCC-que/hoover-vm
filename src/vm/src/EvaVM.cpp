@@ -12,20 +12,20 @@ using syntax::EvaParser;
 
 EvaValue EvaVM::exec(const std::string &program) {
     // 1. Parse the program
-    auto ast = parser->parse(program);
+    auto ast = parser->parse("(begin " + program + ")");
     log(ast.number);
 
     // 2. Compaile Program to Eva bytecode
     co = compiler->compile(ast);
-    std::cout << "where?" << std::endl;
     // constants.push_back(ALLOC_STRING("Hello, "));
     // constants.push_back(ALLOC_STRING("World!"));
     // code = {OP_CONST, 0, OP_CONST, 1, OP_ADD, OP_HALT};
 
     // Set instruction pointer to the begining
     ip = &co->code[0];
-    std::cout << "where?" << std::endl;
     sp = &stack[0];
+
+    bp = sp;
 
     compiler->disassembleByteCode();
 
@@ -128,6 +128,37 @@ EvaValue EvaVM::eval() {
                 break;
             }
 
+            case OP_POP:
+                pop();
+                break;
+
+            case OP_GET_LOCAL: {
+                auto localIndex = READ_BYTE();
+                if (localIndex < 0 || localIndex >= stack.size()) {
+                    DIE << "OP_GET_LOCAL: invalide variable index: " << (int)localIndex;
+                }
+
+                push(bp[localIndex]);
+                break;
+            }
+
+            case OP_SET_LOCAL: {
+                auto localIndex = READ_BYTE();
+                auto value = peek(0);
+                if (localIndex < 0 || localIndex >= stack.size()) {
+                    DIE << "OP_GET_LOCAL: invalide variable index: " << (int)localIndex;
+                }
+                bp[localIndex] = value;
+                break;
+            }
+
+            case OP_SCOPE_EXIT: {
+                auto count = READ_BYTE();
+                *(sp - 1 - count) = peek(0);
+                popN(count);
+                break;
+            }
+
             default:
                 DIE << "Unknown Opcode: " << std::hex << opcode;
         }
@@ -161,6 +192,14 @@ void EvaVM::push(const EvaValue &value) {
 }
 
 void EvaVM::setGlobalVariables() {
-    global->addConst("x", 10);
+    global->addConst("VERSION", 1);
     global->addConst("y", 20);
+}
+
+void EvaVM::popN(size_t count) {
+    if (stack.size() == 0) {
+        DIE << "popN(): empty stack.\n";
+    }
+
+    sp -= count;
 }

@@ -38,6 +38,14 @@ class EvaCompiler {
     void writeByteOffset(size_t offset, uint8_t value);
     std::shared_ptr<Global> global;
     std::unique_ptr<EvaDisassembler> disassembler;
+    void scopeEnter();
+    void scopeExit();
+    bool isGlobalScope();
+    bool isDeclaration(const Exp& exp);
+    bool isVarDeclaration(const Exp& exp);
+    bool isTaggedList(const Exp& exp,
+                      const std::string& tag);
+    size_t getVarsCountOnScopeExit();
 
    public:
     EvaCompiler(std::shared_ptr<Global> global)

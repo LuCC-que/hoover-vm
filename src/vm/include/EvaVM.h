@@ -105,6 +105,8 @@ class EvaVM {
 
     EvaValue pop();
 
+    void popN(size_t count);
+
     // the start
     EvaValue exec(const std::string &program);
 
@@ -128,6 +130,12 @@ class EvaVM {
      * Stack pointer
      */
     EvaValue *sp;
+
+    /**
+     * @brief
+     * base pointer
+     */
+    EvaValue *bp;
 
     /**
      * @brief

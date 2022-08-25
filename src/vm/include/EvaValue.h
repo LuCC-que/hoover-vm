@@ -60,6 +60,11 @@ struct EvaValue {
     };
 };
 
+struct LocalVar {
+    std::string name;
+    size_t scopeLevel;
+};
+
 /**
  * @brief
  * String object
@@ -71,6 +76,26 @@ struct CodeObject : public Object {
     std::string name;
     std::vector<EvaValue> constants;
     std::vector<uint8_t> code;
+
+    size_t scopeLevel = 0;
+    std::vector<LocalVar> locals;
+
+    inline int getLocalIndex(const std::string& name) {
+        if (locals.size() > 0) {
+            // have to go from behind to get the newest stack value
+            for (auto itr = locals.rbegin(); itr != locals.rend(); ++itr) {
+                if (itr->name == name) {
+                    return std::distance(itr, locals.rend()) - 1;
+                }
+            }
+        }
+
+        return -1;
+    };
+
+    inline void addLocal(const std::string& name) {
+        locals.push_back({name, scopeLevel});
+    };
 };
 
 // marcos:
@@ -90,8 +115,8 @@ struct CodeObject : public Object {
 #define AS_CPPSTRING(evaValue) (AS_STRING(evaValue)->string)    // return the string
 #define AS_OBJECT(evaValue) ((Object*)(evaValue).object)        // return object like AS_string
 #define AS_CODE(evaValue) ((CodeObject*)(evaValue).object)      // return code
-//-------------------------------
-// Testers:
+                                                                //-------------------------------
+                                                                // Testers:
 
 #define IS_NUMBER(evaValue) ((evaValue).type == EvaValueType::NUMBER)
 #define IS_BOOLEAN(evaValue) ((evaValue).type == EvaValueType::BOOLEAN)

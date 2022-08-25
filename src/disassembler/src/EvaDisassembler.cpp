@@ -28,7 +28,10 @@ size_t EvaDisassembler::disassembleInstruction(CodeObject* co, size_t offset) {
         case OP_SUB:
         case OP_MUL:
         case OP_DIV:
+        case OP_POP:
             return disassembleSimple(co, opcode, offset);
+        case OP_SCOPE_EXIT:
+            return disassembleWord(co, opcode, offset);
         case OP_CONST:
             return disassembleConst(co, opcode, offset);
         case OP_COMPARE:
@@ -39,6 +42,9 @@ size_t EvaDisassembler::disassembleInstruction(CodeObject* co, size_t offset) {
         case OP_GET_GLOBAL:
         case OP_SET_GLOBAL:
             return disassembleGlobal(co, opcode, offset);
+        case OP_GET_LOCAL:
+        case OP_SET_LOCAL:
+            return disassembleLocal(co, opcode, offset);
         default:
             DIE << "disassembleInstruction: no disassembly for" << opcodeToString(opcode);
     }
@@ -102,6 +108,27 @@ size_t EvaDisassembler::disassembleGlobal(CodeObject* co, uint8_t opcode, size_t
               << global->get(globalIndex).Name
               << ")";
 
+    return offset + 2;
+}
+
+size_t EvaDisassembler::disassembleLocal(CodeObject* co, uint8_t opcode, size_t offset) {
+    dumpBytes(co, offset, 2);
+    printOpCode(opcode);
+
+    auto localIndex = co->code[offset + 1];
+
+    std::cout << (int)localIndex
+              << " ("
+              << co->locals[localIndex].name
+              << ")";
+
+    return offset + 2;
+}
+
+size_t EvaDisassembler::disassembleWord(CodeObject* co, uint8_t opcode, size_t offset) {
+    dumpBytes(co, offset, 2);
+    printOpCode(opcode);
+    std::cout << (int)co->code[offset + 1];
     return offset + 2;
 }
 

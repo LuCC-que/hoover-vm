@@ -35,6 +35,15 @@
 
 #define OP_SET_GLOBAL 0x10
 
+// pop value from stack
+#define OP_POP 0x11
+
+#define OP_GET_LOCAL 0x12
+
+#define OP_SET_LOCAL 0x13
+
+#define OP_SCOPE_EXIT 0x14
+
 //#op -> string var
 //##op -> connect var name to others
 #define OP_STR(op) \
@@ -54,6 +63,10 @@ inline std::string opcodeToString(uint8_t opcode) {
         OP_STR(JUMP);
         OP_STR(GET_GLOBAL);
         OP_STR(SET_GLOBAL);
+        OP_STR(POP);
+        OP_STR(GET_LOCAL);
+        OP_STR(SET_LOCAL);
+        OP_STR(SCOPE_EXIT);
         default:
             DIE << "opcodeToString: Unknown opcode: " << (int)opcode;
     }
