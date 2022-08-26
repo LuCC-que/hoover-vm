@@ -185,23 +185,36 @@ void EvaCompiler::gen(const Exp& exp) {
                     // 1 is variable, set the var here
                     const auto varName = exp.list[1].string;
                     // gen the result first
-                    gen(exp.list[2]);
 
-                    if (isGlobalScope()) {
+                    if (isLambdaDeclaration(exp.list[2])) {
+                        // if is lambda gen the function result
+                        compileFunction(exp.list[2],
+                                        varName,
+                                        exp.list[2].list[1],
+                                        exp.list[2].list[2]);
+                    } else {
+                        // gen the exp result
+                        gen(exp.list[2]);
+                    }
+
+                    /**
+                     * @brief
+                     * if (isGlobalScope()) {
                         global->define(varName);
                         emit(OP_SET_GLOBAL);
-                        // put the index into the stack
                         emit(global->getGlobalIndex(varName));
-                    }
+                    } else {
+                        co->addLocal(varName);  // add local to count the position
 
-                    //---------------------
-                    // locals
-
-                    else {
-                        co->addLocal(varName);
-                        emit(OP_SET_LOCAL);
-                        emit(co->getLocalIndex(varName));
+                        //-------------------
+                        // initializer is already in the right position
+                        // emit(OP_SET_LOCAL);
+                        // emit(co->getLocalIndex(varName));
                     }
+                     */
+
+                    SAVE_AS_GLOBAL_OR_LOCAL(varName)
+
                 }
 
                 else if (op == "set") {
@@ -215,6 +228,7 @@ void EvaCompiler::gen(const Exp& exp) {
                      */
                     gen(exp.list[2]);
                     auto localIndex = co->getLocalIndex(varName);
+
                     if (localIndex != -1) {
                         emit(OP_SET_LOCAL);
                         emit(localIndex);
@@ -234,15 +248,21 @@ void EvaCompiler::gen(const Exp& exp) {
                     for (auto i = 1; i < exp.list.size(); ++i) {
                         bool isLast = i == exp.list.size() - 1;
 
-                        auto isLocalDeclaration =
-                            isDeclaration(exp.list[i]) && !isGlobalScope();
+                        // auto isLocalDeclaration =
+                        //     isDeclaration(exp.list[i]) && !isGlobalScope();
 
+                        bool isDecl = isFuncDeclaration(exp.list[i]) ||
+                                      isDeclaration(exp.list[i]);
                         gen(exp.list[i]);
 
                         // Global var already has the val
                         // not need to have them in stack anymore
                         // save memory
-                        if (!isLast && !isLocalDeclaration) {
+
+                        // after opt, only case set will be pop
+                        // as set loads the value on the top of stack
+                        // and set to the previous index
+                        if (!isLast && !isDecl) {
                             emit(OP_POP);
                         }
                     }
@@ -253,77 +273,51 @@ void EvaCompiler::gen(const Exp& exp) {
                 // (square 2)
                 else if (op == "def") {
                     auto fnName = exp.list[1].string;
-                    auto params = exp.list[2].list;
-                    auto arity = params.size();
-                    auto body = exp.list[3];
-
-                    // save previous code object
-                    auto prevCo = co;
-
-                    // function code object:
-                    auto coValue = creatCodeObjectValue(fnName, arity);
-                    co = AS_CODE(coValue);
-
-                    // store new co as a constant:
-                    prevCo->addConst(coValue);
-
-                    // register the function as local
-                    // so the function can recursively call itself
-                    co->addLocal(fnName);
-
-                    // parameters are added as variables
-                    for (auto i = 0; i < arity; ++i) {
-                        auto argName = exp.list[2].list[i].string;
-                        co->addLocal(argName);
-                    }
-
-                    // compile body in the new code object:
-                    // code has been changed above
-                    gen(body);
-
-                    if (!isBlock(body)) {
-                        emit(OP_SCOPE_EXIT);
-                        emit(arity + 1);
-                    }
-
-                    emit(OP_RETURN);
-
-                    auto fn = ALLOC_FUNCTION(co);
-                    co = prevCo;
-                    co->addConst(fn);
-
-                    emit(OP_CONST);
-                    emit(co->constants.size() - 1);
+                    compileFunction(
+                        /*exp*/ exp,
+                        /*name*/ fnName,
+                        /*params*/ exp.list[2],
+                        /*body*/ exp.list[3]);
 
                     // define the function as a variable in out co:
-
-                    if (isGlobalScope()) {
-                        global->define(fnName);
+                    /**
+                     * @brief
+                     * if (isGlobalScope()) {
+                        global->define(varName);
                         emit(OP_SET_GLOBAL);
-                        emit(global->getGlobalIndex(fnName));
+                        emit(global->getGlobalIndex(varName));
                     } else {
-                        co->addLocal(fnName);
-                        emit(OP_SET_LOCAL);
-                        emit(co->getLocalIndex(fnName));
-                    }
+                        co->addLocal(varName);  // add local to count the position
 
+                        //-------------------
+                        // initializer is already in the right position
+                        // emit(OP_SET_LOCAL);
+                        // emit(co->getLocalIndex(varName));
+                    }
+                     */
+
+                    SAVE_AS_GLOBAL_OR_LOCAL(fnName)
+
+                } else if (op == "lambda") {
+                    //
+                    compileFunction(
+                        /*exp*/ exp,
+                        /*name*/ "lambda",
+                        /*params*/ exp.list[1],
+                        /*body*/ exp.list[2]);
                 }
                 //------------------------------
                 // Function calls:
                 // (square 2)
                 else {
-                    // set up the function
-                    gen(exp.list[0]);
-                    for (auto i = 1; i < exp.list.size(); ++i) {
-                        // set up parameters
-                        gen(exp.list[i]);
-                    }
-
-                    emit(OP_CALL);
-
-                    // set up how many arguments
-                    emit(exp.list.size() - 1);
+                    FUNCTION_CALL(exp)
                 }
+            }
+            //------No symbol------------------
+            // Lamda Function calls:
+            // ()
+            else {
+                FUNCTION_CALL(exp)
             }
             break;
     }
@@ -386,31 +380,39 @@ void EvaCompiler::scopeExit() {
     co->scopeLevel--;
 }
 
-bool EvaCompiler::isGlobalScope() {
+bool EvaCompiler::isGlobalScope() const {
     return co->name == "main" && co->scopeLevel == 1;
 }
 
-bool EvaCompiler::isFunctionBody() {
+bool EvaCompiler::isFunctionBody() const {
     return co->name != "main" && co->scopeLevel == 1;
 }
 
-bool EvaCompiler::isDeclaration(const Exp& exp) {
+bool EvaCompiler::isDeclaration(const Exp& exp) const {
     return isVarDeclaration(exp);
 }
 
-bool EvaCompiler::isVarDeclaration(const Exp& exp) {
+bool EvaCompiler::isVarDeclaration(const Exp& exp) const {
     return isTaggedList(exp, "var");
 }
 
 bool EvaCompiler::isTaggedList(const Exp& exp,
-                               const std::string& tag) {
+                               const std::string& tag) const {
     return (exp.type == ExpType::LIST &&
             exp.list[0].type == ExpType::SYMBOL &&
             exp.list[0].string == tag);
 }
 
-bool EvaCompiler::isBlock(const Exp& exp) {
+bool EvaCompiler::isBlock(const Exp& exp) const {
     return isTaggedList(exp, "begin");
+}
+
+bool EvaCompiler::isLambdaDeclaration(const Exp& exp) const {
+    return isTaggedList(exp, "lambda");
+}
+
+bool EvaCompiler::isFuncDeclaration(const Exp& exp) const {
+    return isTaggedList(exp, "def");
 }
 
 size_t EvaCompiler::getVarsCountOnScopeExit() {
@@ -437,3 +439,49 @@ EvaValue EvaCompiler::creatCodeObjectValue(const std::string& name, size_t arity
 }
 
 FunctionObject* EvaCompiler::getMainFunction() { return main; }
+
+void EvaCompiler::compileFunction(const Exp& exp,
+                                  const std::string fnName,
+                                  const Exp& params,
+                                  const Exp& body) {
+    auto arity = params.list.size();
+
+    // save previous code object
+    auto prevCo = co;
+
+    // function code object:
+    auto coValue = creatCodeObjectValue(fnName, arity);
+    co = AS_CODE(coValue);
+
+    // store new co as a constant:
+    prevCo->addConst(coValue);
+
+    // register the function as local
+    // so the function can recursively call itself
+    co->addLocal(fnName);
+
+    // parameters are added as variables
+    auto itr = params.list.begin();
+    while (itr != params.list.end()) {
+        co->addLocal(itr++->string);
+    }
+
+    // compile body in the new code object:
+    // code has been changed above
+    gen(body);
+
+    if (!isBlock(body)) {
+        emit(OP_SCOPE_EXIT);
+        emit(arity + 1);
+    }
+
+    emit(OP_RETURN);
+
+    // add the function as constant
+    auto fn = ALLOC_FUNCTION(co);  // encapusalte
+    co = prevCo;                   // recover
+    co->addConst(fn);
+
+    emit(OP_CONST);
+    emit(co->constants.size() - 1);
+}

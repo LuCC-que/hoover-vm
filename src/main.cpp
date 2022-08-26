@@ -7,23 +7,26 @@
 int main(int argc, char const *argv[]) {
     EvaVM vm;
     auto result = vm.exec(R"(
-
-        // (def square (x) (* x x))
-
-        // (square 2) //4
-
-        // (def sum (a b)
-        //     (begin
-        //         (var x 10)
-        //         (+ x (+ a b))))
-        // (sum 5 4)
-
+        // (var adder (lambda (x) (+ x x)))
         (def factorial (x)
             (if (== x 1)
                 1
                 (* x (factorial (- x 1)))))
         
         (factorial 5)
+        // //IIIE
+        // (adder 2)
+
+        // (var x 1)
+        // (var y (+ x 1))
+
+        // (begin
+        //     (var a 10)
+        //     (var b 20)
+        //     (set a 100)
+        //     (+ a b)
+        // )
+        
    )");
 
     vm.DebugDumpStack(0);

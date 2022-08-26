@@ -27,6 +27,24 @@
     gen(exp.list[2]);     \
     emit(op);
 
+#define FUNCTION_CALL(exp)                       \
+    gen(exp.list[0]);                            \
+    for (auto i = 1; i < exp.list.size(); ++i) { \
+        gen(exp.list[i]);                        \
+    }                                            \
+    emit(OP_CALL);                               \
+    emit(exp.list.size() - 1);
+
+// optimazied
+#define SAVE_AS_GLOBAL_OR_LOCAL(name)       \
+    if (isGlobalScope()) {                  \
+        global->define(name);               \
+        emit(OP_SET_GLOBAL);                \
+        emit(global->getGlobalIndex(name)); \
+    } else {                                \
+        co->addLocal(name);                 \
+    }
+
 class EvaCompiler {
    private:
     void emit(uint8_t code);
@@ -40,16 +58,23 @@ class EvaCompiler {
     std::unique_ptr<EvaDisassembler> disassembler;
     void scopeEnter();
     void scopeExit();
-    bool isGlobalScope();
-    bool isDeclaration(const Exp& exp);
-    bool isVarDeclaration(const Exp& exp);
+    bool isGlobalScope() const;
+    bool isFunctionBody() const;
+    bool isBlock(const Exp& exp) const;
+    bool isDeclaration(const Exp& exp) const;
+    bool isVarDeclaration(const Exp& exp) const;
+    bool isFuncDeclaration(const Exp& exp) const;
     bool isTaggedList(const Exp& exp,
-                      const std::string& tag);
+                      const std::string& tag) const;
+    bool isLambdaDeclaration(const Exp& exp) const;
     size_t getVarsCountOnScopeExit();
     EvaValue creatCodeObjectValue(const std::string& name, size_t arity = 0);
-    bool isBlock(const Exp& exp);
-    bool isFunctionBody();
+
     FunctionObject* main;
+    void compileFunction(const Exp& exp,
+                         const std::string fnName,
+                         const Exp& params,
+                         const Exp& body);
 
    public:
     EvaCompiler(std::shared_ptr<Global> global)

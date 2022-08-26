@@ -126,7 +126,9 @@ EvaValue EvaVM::eval() {
                 auto globalIndex = READ_BYTE();
                 // result on the stack, in this case
                 // usually the top
-                auto value = peek(0);
+
+                // opt: pop the global automatically
+                auto value = pop();
                 global->set(globalIndex, value);
                 break;
             }
