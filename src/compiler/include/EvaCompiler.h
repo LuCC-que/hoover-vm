@@ -20,7 +20,7 @@
             return std::distance(co->constants.begin(), itr);                   \
         }                                                                       \
     }                                                                           \
-    co->constants.push_back(allocator(value));
+    co->addConst(allocator(value));
 
 #define GEN_BINARY_OP(op) \
     gen(exp.list[1]);     \
@@ -46,6 +46,8 @@ class EvaCompiler {
     bool isTaggedList(const Exp& exp,
                       const std::string& tag);
     size_t getVarsCountOnScopeExit();
+    EvaValue creatCodeObjectValue(const std::string& name, size_t arity = 0);
+    bool isBlock(const Exp& exp);
 
    public:
     EvaCompiler(std::shared_ptr<Global> global)
@@ -59,6 +61,7 @@ class EvaCompiler {
     void gen(const Exp& exp);
 
     CodeObject* co;
+    std::vector<CodeObject*> codeObjects_;
 };
 
 static std::map<std::string, uint8_t> compareOps_{

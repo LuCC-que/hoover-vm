@@ -177,6 +177,9 @@ EvaValue EvaVM::eval() {
 
                 // user defined function: (to-do)
             }
+            case OP_RETURN: {
+                return pop();
+            }
 
             default:
                 DIE << "Unknown Opcode: " << std::hex << opcode;
@@ -212,7 +215,7 @@ void EvaVM::push(const EvaValue &value) {
 
 void EvaVM::setGlobalVariables() {
     global->addNativeFunction(
-        "square",
+        "native-square",
         [&]() {
             auto x = AS_NUMBER(peek(0));
             push(NUMBER(x * x));

@@ -1,7 +1,7 @@
 #include "EvaCompiler.h"
 
 CodeObject* EvaCompiler::compile(const Exp& exp) {
-    co = AS_CODE(ALLOC_CODE("main"));
+    co = AS_CODE(creatCodeObjectValue("main"));
     gen(exp);
     emit(OP_HALT);
     return co;
@@ -249,6 +249,66 @@ void EvaCompiler::gen(const Exp& exp) {
                     scopeExit();
                 }
                 //------------------------------
+                // user defined function:
+                // (square 2)
+                else if (op == "def") {
+                    auto fnName = exp.list[1].string;
+                    auto params = exp.list[2].list;
+                    auto arity = params.size();
+                    auto body = exp.list[3];
+
+                    // save previous code object
+                    auto prevCo = co;
+
+                    // function code object:
+                    auto coValue = creatCodeObjectValue(fnName, arity);
+                    co = AS_CODE(coValue);
+
+                    // store new co as a constant:
+                    prevCo->addConst(coValue);
+
+                    // register the function as local
+                    // so the function can recursively call itself
+                    co->addLocal(fnName);
+
+                    // parameters are added as variables
+                    for (auto i = 0; i < arity; ++i) {
+                        auto argName = exp.list[2].list[i].string;
+                        co->addLocal(argName);
+                    }
+
+                    // compile body in the new code object:
+                    // code has been changed above
+                    gen(body);
+
+                    if (!isBlock(body)) {
+                        emit(OP_SCOPE_EXIT);
+                        emit(arity + 1);
+                    }
+
+                    emit(OP_RETURN);
+
+                    auto fn = ALLOC_FUNCTION(co);
+                    co = prevCo;
+                    co->addConst(fn);
+
+                    emit(OP_CONST);
+                    emit(co->constants.size() - 1);
+
+                    // define the function as a variable in out co:
+
+                    if (isGlobalScope()) {
+                        global->define(fnName);
+                        emit(OP_SET_GLOBAL);
+                        emit(global->getGlobalIndex(fnName));
+                    } else {
+                        co->addLocal(fnName);
+                        emit(OP_SET_LOCAL);
+                        emit(co->getLocalIndex(fnName));
+                    }
+
+                }
+                //------------------------------
                 // Function calls:
                 // (square 2)
                 else {
@@ -304,7 +364,9 @@ size_t EvaCompiler::booleanConstIdx(const bool value) {
 }
 
 void EvaCompiler::disassembleByteCode() {
-    disassembler->disassemble(co);
+    for (auto& co_ : codeObjects_) {
+        disassembler->disassemble(co_);
+    }
 }
 
 void EvaCompiler::scopeEnter() {
@@ -339,6 +401,10 @@ bool EvaCompiler::isTaggedList(const Exp& exp,
             exp.list[0].string == tag);
 }
 
+bool EvaCompiler::isBlock(const Exp& exp) {
+    return isTaggedList(exp, "begin");
+}
+
 size_t EvaCompiler::getVarsCountOnScopeExit() {
     auto varsCount = 0;
 
@@ -352,4 +418,12 @@ size_t EvaCompiler::getVarsCountOnScopeExit() {
     }
 
     return varsCount;
+}
+
+EvaValue EvaCompiler::creatCodeObjectValue(const std::string& name, size_t arity) {
+    auto coValue = ALLOC_CODE(name, arity);
+    auto co = AS_CODE(coValue);
+
+    codeObjects_.push_back(co);
+    return coValue;
 }

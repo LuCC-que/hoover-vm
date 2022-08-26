@@ -8,8 +8,16 @@ int main(int argc, char const *argv[]) {
     EvaVM vm;
     auto result = vm.exec(R"(
 
-        (var x 3)
-        (sum 2 x)
+        (def square (x) (* x x))
+
+        // (square 2) //4
+
+        // (def factorial (x)
+        //     (if (== x 1)
+        //         1
+        //         (* x (factorial (- x 1)))))
+        
+        // (factorial 5)
    )");
 
     log(result);
