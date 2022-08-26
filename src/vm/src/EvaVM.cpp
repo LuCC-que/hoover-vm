@@ -35,6 +35,7 @@ EvaValue EvaVM::exec(const std::string &program) {
 EvaValue EvaVM::eval() {
     for (;;) {
         auto opcode = READ_BYTE();
+        DebugDumpStack(opcode);
         switch (opcode) {
             case OP_HALT:
                 return pop();
@@ -154,9 +155,27 @@ EvaValue EvaVM::eval() {
 
             case OP_SCOPE_EXIT: {
                 auto count = READ_BYTE();
+
+                // save the result to the top
                 *(sp - 1 - count) = peek(0);
                 popN(count);
                 break;
+            }
+
+            case OP_CALL: {
+                auto argsCount = READ_BYTE();
+                auto fnValue = peek(argsCount);
+
+                // Native function
+                if (IS_NATIVE(fnValue)) {
+                    AS_NATIVE(fnValue)->function();
+                    auto result = pop();
+                    popN(argsCount + 1);
+                    push(result);
+                    break;
+                }
+
+                // user defined function: (to-do)
             }
 
             default:
@@ -192,8 +211,24 @@ void EvaVM::push(const EvaValue &value) {
 }
 
 void EvaVM::setGlobalVariables() {
+    global->addNativeFunction(
+        "square",
+        [&]() {
+            auto x = AS_NUMBER(peek(0));
+            push(NUMBER(x * x));
+        },
+        1);
+
+    global->addNativeFunction(
+        "sum",
+        [&]() {
+            auto v2 = AS_NUMBER(peek(0));
+            auto v1 = AS_NUMBER(peek(1));
+            push(NUMBER(v1 + v2));
+        },
+        2);
+
     global->addConst("VERSION", 1);
-    global->addConst("y", 20);
 }
 
 void EvaVM::popN(size_t count) {
@@ -202,4 +237,20 @@ void EvaVM::popN(size_t count) {
     }
 
     sp -= count;
+}
+
+void EvaVM::DebugDumpStack(uint8_t op) {
+    std::cout << "\n========= Stack ===========\n";
+    std::cout << ">> op: OP_" << opcodeToString(op) << std::endl;
+    if (sp == stack.begin()) {
+        std::cout << "(empty)";
+    }
+
+    auto csp = sp - 1;
+
+    while (csp >= stack.begin()) {
+        std::cout << *csp-- << "\n";
+    }
+
+    std::cout << "\n";
 }

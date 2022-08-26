@@ -160,6 +160,8 @@ class EvaVM {
     std::unique_ptr<EvaCompiler> compiler;
 
     CodeObject *co;
+
+    void DebugDumpStack(uint8_t op);
 };
 
 #endif

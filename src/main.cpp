@@ -8,23 +8,14 @@ int main(int argc, char const *argv[]) {
     EvaVM vm;
     auto result = vm.exec(R"(
 
-        (var x 5)
-        (set x (+ x 10))
-
-        x
-
-        (begin
-            (var x 100)
-            (begin 
-                (var x 200)
-            x)
-        x)
-
-        x
+        (var x 3)
+        (sum 2 x)
    )");
 
     log(result);
 
+    vm.DebugDumpStack(0);
+    std::cout << std::endl;
     std::cout << "all passed!" << std::endl;
     return 0;
 }

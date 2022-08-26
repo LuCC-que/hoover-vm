@@ -22,6 +22,9 @@ struct Global {
     bool exists(const std::string& name);
 
     GlobalVar get(const size_t index);
+
+    // Adds a native function for testing
+    void addNativeFunction(const std::string& name, std::function<void()> fn, size_t arity);
 };
 
 #endif

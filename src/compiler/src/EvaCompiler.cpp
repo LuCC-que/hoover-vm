@@ -36,7 +36,7 @@ void EvaCompiler::gen(const Exp& exp) {
                     emit(localIndex);
                 } else {
                     if (!global->exists(exp.string)) {
-                        DIE << "[EvaCompiler]: Reference error:" << exp.string;
+                        DIE << "[EvaCompiler]: Global Values Reference error:" << exp.string;
                     }
 
                     emit(OP_GET_GLOBAL);
@@ -84,7 +84,7 @@ void EvaCompiler::gen(const Exp& exp) {
                 //-------------------------
                 // Branch Instruction:
 
-                if (op == "if") {
+                else if (op == "if") {
                     gen(exp.list[1]);
                     emit(OP_JMP_IF_FALSE);
 
@@ -116,6 +116,69 @@ void EvaCompiler::gen(const Exp& exp) {
 
                     auto endBranchAddr = getOffset();
                     patchJumpAddress(endAddr, endBranchAddr);
+                }
+
+                else if (op == "while") {
+                    auto loopStartAddr = getOffset();
+
+                    gen(exp.list[1]);
+                    emit(OP_JMP_IF_FALSE);
+
+                    // end address
+                    emit(0);
+                    emit(0);
+
+                    auto loopEndJmpAddr = getOffset() - 2;
+
+                    gen(exp.list[2]);
+
+                    // iterate
+                    emit(OP_JUMP);
+                    emit(0);  // address
+                    emit(0);
+                    // set address
+                    patchJumpAddress(getOffset() - 2, loopStartAddr);
+
+                    auto loopEndAddr = getOffset() + 1;
+
+                    // set end address
+                    patchJumpAddress(loopEndJmpAddr, loopEndAddr);
+                }
+
+                else if (op == "for") {
+                    // initialize
+                    gen(exp.list[1]);
+
+                    auto loopStartAddr = getOffset();
+                    // condition
+                    gen(exp.list[2]);
+
+                    emit(OP_JMP_IF_FALSE);
+
+                    // end address
+                    emit(0);
+                    emit(0);
+
+                    auto loopEndJmpAddr = getOffset() - 2;
+
+                    // body
+                    gen(exp.list[4]);
+
+                    // update
+                    gen(exp.list[3]);
+
+                    // iterate
+                    emit(OP_JUMP);
+                    emit(0);  // address
+                    emit(0);
+                    // set address
+                    patchJumpAddress(getOffset() - 2, loopStartAddr);
+
+                    auto loopEndAddr = getOffset() + 1;
+
+                    // set end address
+                    patchJumpAddress(loopEndJmpAddr, loopEndAddr);
+
                 }
 
                 else if (op == "var") {
@@ -184,6 +247,22 @@ void EvaCompiler::gen(const Exp& exp) {
                         }
                     }
                     scopeExit();
+                }
+                //------------------------------
+                // Function calls:
+                // (square 2)
+                else {
+                    // set up the function
+                    gen(exp.list[0]);
+                    for (auto i = 1; i < exp.list.size(); ++i) {
+                        // set up parameters
+                        gen(exp.list[i]);
+                    }
+
+                    emit(OP_CALL);
+
+                    // set up how many arguments
+                    emit(exp.list.size() - 1);
                 }
             }
             break;
@@ -265,6 +344,8 @@ size_t EvaCompiler::getVarsCountOnScopeExit() {
 
     if (co->locals.size() > 0) {
         while (co->locals.back().scopeLevel == co->scopeLevel) {
+            // remove the locals from the co here
+            // vm doesnt need them
             co->locals.pop_back();
             varsCount++;
         }

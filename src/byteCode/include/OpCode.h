@@ -44,6 +44,8 @@
 
 #define OP_SCOPE_EXIT 0x14
 
+#define OP_CALL 0x15
+
 //#op -> string var
 //##op -> connect var name to others
 #define OP_STR(op) \
@@ -67,6 +69,7 @@ inline std::string opcodeToString(uint8_t opcode) {
         OP_STR(GET_LOCAL);
         OP_STR(SET_LOCAL);
         OP_STR(SCOPE_EXIT);
+        OP_STR(CALL);
         default:
             DIE << "opcodeToString: Unknown opcode: " << (int)opcode;
     }

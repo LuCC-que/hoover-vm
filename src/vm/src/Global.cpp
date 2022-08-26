@@ -46,3 +46,13 @@ void Global::addConst(const std::string& name, double value) {
 
     globals.push_back({name, NUMBER(value)});
 }
+
+void Global::addNativeFunction(const std::string& name,
+                               std::function<void()> fn,
+                               size_t arity) {
+    if (exists(name)) {
+        return;
+    }
+
+    globals.push_back({name, ALLOC_NATIVE(fn, name, arity)});
+}
