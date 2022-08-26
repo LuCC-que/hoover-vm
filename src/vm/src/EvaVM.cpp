@@ -16,13 +16,15 @@ EvaValue EvaVM::exec(const std::string &program) {
     log(ast.number);
 
     // 2. Compaile Program to Eva bytecode
-    co = compiler->compile(ast);
+    compiler->compile(ast);
     // constants.push_back(ALLOC_STRING("Hello, "));
     // constants.push_back(ALLOC_STRING("World!"));
     // code = {OP_CONST, 0, OP_CONST, 1, OP_ADD, OP_HALT};
 
+    fn = compiler->getMainFunction();
+
     // Set instruction pointer to the begining
-    ip = &co->code[0];
+    ip = &fn->co->code[0];
     sp = &stack[0];
 
     bp = sp;
@@ -164,7 +166,7 @@ EvaValue EvaVM::eval() {
 
             case OP_CALL: {
                 auto argsCount = READ_BYTE();
-                auto fnValue = peek(argsCount);
+                EvaValue fnValue = peek(argsCount);  // get the function
 
                 // Native function
                 if (IS_NATIVE(fnValue)) {
@@ -176,9 +178,31 @@ EvaValue EvaVM::eval() {
                 }
 
                 // user defined function: (to-do)
+                auto callee = AS_FUNCTION(fnValue);
+
+                // Save the current frame, wait for return
+                callStack.push(Frame{ip, bp, fn});
+
+                // set to the current calling function
+                fn = callee;
+
+                // set the base pointer for the callee as a frame
+                bp = sp - argsCount - 1;
+
+                // jump to the initial instruction of the function
+                ip = &callee->co->code[0];
+
+                break;
             }
             case OP_RETURN: {
-                return pop();
+                auto callerFrame = callStack.top();
+
+                ip = callerFrame.ra;
+                bp = callerFrame.bp;
+                fn = callerFrame.fn;
+
+                callStack.pop();
+                break;
             }
 
             default:

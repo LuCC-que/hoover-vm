@@ -49,7 +49,6 @@ class EvaCompiler {
     EvaValue creatCodeObjectValue(const std::string& name, size_t arity = 0);
     bool isBlock(const Exp& exp);
     bool isFunctionBody();
-
     FunctionObject* main;
 
    public:
@@ -59,9 +58,10 @@ class EvaCompiler {
 
     void disassembleByteCode();
 
-    CodeObject* compile(const Exp& exp);
+    void compile(const Exp& exp);
 
     void gen(const Exp& exp);
+    FunctionObject* getMainFunction();
 
     CodeObject* co;
     std::vector<CodeObject*> codeObjects_;

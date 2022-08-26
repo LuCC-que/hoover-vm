@@ -12,22 +12,23 @@ int main(int argc, char const *argv[]) {
 
         // (square 2) //4
 
-        (def sum (a b)
-            (begin
-                (var x 10)
-                (+ x (+ a b))))
+        // (def sum (a b)
+        //     (begin
+        //         (var x 10)
+        //         (+ x (+ a b))))
+        // (sum 5 4)
 
-        // (def factorial (x)
-        //     (if (== x 1)
-        //         1
-        //         (* x (factorial (- x 1)))))
+        (def factorial (x)
+            (if (== x 1)
+                1
+                (* x (factorial (- x 1)))))
         
-        // (factorial 5)
+        (factorial 5)
    )");
 
-    log(result);
-
     vm.DebugDumpStack(0);
+    std::cout << std::endl;
+    log(result);
     std::cout << std::endl;
     std::cout << "all passed!" << std::endl;
     return 0;

@@ -25,9 +25,9 @@ using syntax::EvaParser;
 
 #define READ_BYTE() *ip++
 #define STACK_LIMIT 512
-#define GET_CONST() co->constants[READ_BYTE()]
+#define GET_CONST() fn->co->constants[READ_BYTE()]
 #define READ_SHORT() (ip += 2, (uint16_t)((ip[-2] << 8) | ip[-1]))
-#define TO_ADDRESS(index) &co->code[index]
+#define TO_ADDRESS(index) &fn->co->code[index]
 
 #define BINARY_OP(op)                \
     do {                             \
@@ -72,6 +72,12 @@ using syntax::EvaParser;
             break;                 \
     }                              \
     push(BOOLEAN(res));
+
+struct Frame {
+    uint8_t *ra;         // return address
+    EvaValue *bp;        // previous base pointer
+    FunctionObject *fn;  // previous function
+};
 
 class EvaVM {
    private:
@@ -145,6 +151,12 @@ class EvaVM {
 
     /**
      * @brief
+     * Separete stack for call. Keeps return addresses;
+     */
+    std::stack<Frame> callStack;
+
+    /**
+     * @brief
      * Constant pool
      */
     std::vector<EvaValue> constants;
@@ -159,7 +171,7 @@ class EvaVM {
 
     std::unique_ptr<EvaCompiler> compiler;
 
-    CodeObject *co;
+    FunctionObject *fn;
 
     void DebugDumpStack(uint8_t op);
 };

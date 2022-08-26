@@ -1,10 +1,10 @@
 #include "EvaCompiler.h"
 
-CodeObject* EvaCompiler::compile(const Exp& exp) {
+void EvaCompiler::compile(const Exp& exp) {
     co = AS_CODE(creatCodeObjectValue("main"));
+    main = AS_FUNCTION(ALLOC_FUNCTION(co));
     gen(exp);
     emit(OP_HALT);
-    return co;
 }
 
 void EvaCompiler::gen(const Exp& exp) {
@@ -435,3 +435,5 @@ EvaValue EvaCompiler::creatCodeObjectValue(const std::string& name, size_t arity
     codeObjects_.push_back(co);
     return coValue;
 }
+
+FunctionObject* EvaCompiler::getMainFunction() { return main; }
