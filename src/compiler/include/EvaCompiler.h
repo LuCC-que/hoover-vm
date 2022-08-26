@@ -48,6 +48,9 @@ class EvaCompiler {
     size_t getVarsCountOnScopeExit();
     EvaValue creatCodeObjectValue(const std::string& name, size_t arity = 0);
     bool isBlock(const Exp& exp);
+    bool isFunctionBody();
+
+    FunctionObject* main;
 
    public:
     EvaCompiler(std::shared_ptr<Global> global)

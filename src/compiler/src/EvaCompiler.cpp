@@ -375,8 +375,12 @@ void EvaCompiler::scopeEnter() {
 void EvaCompiler::scopeExit() {
     auto varsCount = getVarsCountOnScopeExit();
 
-    if (varsCount > 0) {
+    if (varsCount > 0 || co->arity > 0) {
         emit(OP_SCOPE_EXIT);
+
+        if (isFunctionBody()) {
+            varsCount += co->arity + 1;
+        }
         emit(varsCount);
     }
     co->scopeLevel--;
@@ -384,6 +388,10 @@ void EvaCompiler::scopeExit() {
 
 bool EvaCompiler::isGlobalScope() {
     return co->name == "main" && co->scopeLevel == 1;
+}
+
+bool EvaCompiler::isFunctionBody() {
+    return co->name != "main" && co->scopeLevel == 1;
 }
 
 bool EvaCompiler::isDeclaration(const Exp& exp) {
