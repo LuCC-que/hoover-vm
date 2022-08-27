@@ -17,13 +17,18 @@ int main(int argc, char const *argv[]) {
         // //IIIE
         // (adder 2)
 
-        // (var x 1)
+        (var x 10)
+        (def foo() x)
         // (var y (+ x 1))
 
         (begin
             (var y 100)
+            (var q 300)
+            q
+            (+ y x)
             (begin 
                 (var z 200)
+                z
                 (def bar () (+ y z))
                 (bar)
             )

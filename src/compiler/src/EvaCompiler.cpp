@@ -75,6 +75,7 @@ void EvaCompiler::analyze(const Exp& exp,
 
                     analyze(exp.list[2], newScope);
                 } else {
+                    // binary
                     for (auto i = 1; i < exp.list.size(); ++i) {
                         analyze(exp.list[i], scope);
                     }
@@ -111,18 +112,28 @@ void EvaCompiler::gen(const Exp& exp) {
                 //---------------------------------------------
                 // variable
                 auto varName = exp.string;
-                auto localIndex = co->getLocalIndex(varName);
 
-                if (localIndex != -1) {
-                    emit(OP_GET_LOCAL);
-                    emit(localIndex);
-                } else {
-                    if (!global->exists(exp.string)) {
-                        DIE << "[EvaCompiler]: Global Values Reference error:" << exp.string;
+                auto opCodeGetter = scopeStack_.top()->getNameGetter(varName);
+
+                // cell ? local ? gloabl
+                emit(opCodeGetter);
+
+                switch (opCodeGetter) {
+                    case OP_GET_LOCAL: {
+                        emit(co->getLocalIndex(varName));
+                        break;
                     }
-
-                    emit(OP_GET_GLOBAL);
-                    emit(global->getGlobalIndex(exp.string));
+                    case OP_GET_CELL: {
+                        emit(co->getCellIndex(varName));
+                        break;
+                    }
+                    default: {
+                        if (!global->exists(varName)) {
+                            DIE << "[EvaCompiler]: Reference error: " << varName;
+                        }
+                        emit(global->getGlobalIndex(varName));
+                        break;
+                    }
                 }
             }
             break;
@@ -268,6 +279,8 @@ void EvaCompiler::gen(const Exp& exp) {
                     const auto varName = exp.list[1].string;
                     // gen the result first
 
+                    auto opCodeSetter = scopeStack_.top()->getNameSetter(varName);
+
                     if (isLambdaDeclaration(exp.list[2])) {
                         // if is lambda gen the function result
                         compileFunction(exp.list[2],
@@ -279,28 +292,38 @@ void EvaCompiler::gen(const Exp& exp) {
                         gen(exp.list[2]);
                     }
 
-                    /**
-                     * @brief
-                     * if (isGlobalScope()) {
-                        global->define(varName);
-                        emit(OP_SET_GLOBAL);
-                        emit(global->getGlobalIndex(varName));
-                    } else {
-                        co->addLocal(varName);  // add local to count the position
-
-                        //-------------------
-                        // initializer is already in the right position
-                        // emit(OP_SET_LOCAL);
-                        // emit(co->getLocalIndex(varName));
+                    switch (opCodeSetter) {
+                        case OP_SET_GLOBAL: {
+                            global->define(varName);
+                            emit(OP_SET_GLOBAL);
+                            emit(global->getGlobalIndex(varName));
+                            break;
+                        }
+                        case OP_SET_CELL: {
+                            // emit(co->getCellIndex(varName));
+                            co->cellNames.push_back(varName);
+                            emit(OP_SET_CELL);
+                            emit(co->cellNames.size() - 1);
+                            emit(OP_POP);
+                            break;
+                        }
+                        default: {
+                            co->addLocal(varName);
+                        }
                     }
-                     */
 
-                    SAVE_AS_GLOBAL_OR_LOCAL(varName)
+                    // if (isGlobalScope()) {
+                    //     global->define(varName);
+                    //     emit(OP_SET_GLOBAL);
+                    //     emit(global->getGlobalIndex(varName))
+                    // }
 
                 }
 
                 else if (op == "set") {
                     const auto varName = exp.list[1].string;
+
+                    auto opCodeSetter = scopeStack_.top()->getNameSetter(varName);
 
                     /**
                      * @brief
@@ -309,24 +332,34 @@ void EvaCompiler::gen(const Exp& exp) {
                      * it it is expression, CONST L CONST R OP
                      */
                     gen(exp.list[2]);
-                    auto localIndex = co->getLocalIndex(varName);
 
-                    if (localIndex != -1) {
-                        emit(OP_SET_LOCAL);
-                        emit(localIndex);
-                    } else {
-                        auto globalIndex = global->getGlobalIndex(varName);
-                        if (globalIndex == -1) {
-                            DIE << "Reference Error: " << varName << " is not defined.";
+                    switch (opCodeSetter) {
+                        case OP_SET_LOCAL: {
+                            emit(OP_SET_LOCAL);
+                            emit(co->getLocalIndex(varName));
+                            break;
                         }
-                        emit(OP_SET_GLOBAL);
-                        emit(globalIndex);
+                        case OP_SET_CELL: {
+                            emit(OP_SET_CELL);
+                            emit(co->getCellIndex(varName));
+                            break;
+                        }
+                        default: {
+                            auto globalIndex = global->getGlobalIndex(varName);
+                            if (globalIndex == -1) {
+                                DIE << "Reference Error: " << varName << " is not defined.";
+                            }
+                            emit(OP_SET_GLOBAL);
+                            emit(globalIndex);
+                            break;
+                        }
                     }
 
                 }
 
                 else if (op == "begin") {
-                    scopeEnter();
+                    scopeStack_.push(scopeInfo_.at(&exp));
+                    blockEnter();
                     for (auto i = 1; i < exp.list.size(); ++i) {
                         bool isLast = i == exp.list.size() - 1;
 
@@ -348,7 +381,8 @@ void EvaCompiler::gen(const Exp& exp) {
                             emit(OP_POP);
                         }
                     }
-                    scopeExit();
+                    blockExit();
+                    scopeStack_.pop();
                 }
                 //------------------------------
                 // user defined function:
@@ -445,10 +479,10 @@ void EvaCompiler::disassembleByteCode() {
     }
 }
 
-void EvaCompiler::scopeEnter() {
+void EvaCompiler::blockEnter() {
     co->scopeLevel++;
 }
-void EvaCompiler::scopeExit() {
+void EvaCompiler::blockExit() {
     auto varsCount = getVarsCountOnScopeExit();
 
     if (varsCount > 0 || co->arity > 0) {
@@ -526,6 +560,9 @@ void EvaCompiler::compileFunction(const Exp& exp,
                                   const std::string fnName,
                                   const Exp& params,
                                   const Exp& body) {
+    auto scopeInfo = scopeInfo_.at(&exp);
+    scopeStack_.push(scopeInfo);
+
     auto arity = params.list.size();
 
     // save previous code object
@@ -534,6 +571,22 @@ void EvaCompiler::compileFunction(const Exp& exp,
     // function code object:
     auto coValue = creatCodeObjectValue(fnName, arity);
     co = AS_CODE(coValue);
+
+    // if (scopeInfo->scopeType != ScopeType::GLOBAL) {
+    co->freeCount = scopeInfo->free.size();
+
+    // preserver memory for potential uses
+    co->cellNames.reserve(scopeInfo->free.size() +
+                          scopeInfo->cells.size());
+
+    co->cellNames.insert(co->cellNames.end(),
+                         scopeInfo->free.begin(),
+                         scopeInfo->free.end());
+
+    co->cellNames.insert(co->cellNames.end(),
+                         scopeInfo->cells.begin(),
+                         scopeInfo->cells.end());
+    // }
 
     // store new co as a constant:
     prevCo->addConst(coValue);
@@ -545,7 +598,15 @@ void EvaCompiler::compileFunction(const Exp& exp,
     // parameters are added as variables
     auto itr = params.list.begin();
     while (itr != params.list.end()) {
-        co->addLocal(itr++->string);
+        auto argName = itr++->string;
+        co->addLocal(argName);
+
+        auto cellIndex = co->getCellIndex(argName);
+
+        if (cellIndex != -1) {
+            emit(OP_SET_CELL);
+            emit(cellIndex);
+        }
     }
 
     // compile body in the new code object:
@@ -566,4 +627,6 @@ void EvaCompiler::compileFunction(const Exp& exp,
 
     emit(OP_CONST);
     emit(co->constants.size() - 1);
+
+    scopeStack_.pop();
 }

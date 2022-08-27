@@ -30,8 +30,8 @@ EvaValue EvaVM::exec(const std::string &program) {
     bp = sp;
 
     compiler->disassembleByteCode();
-
-    return eval();
+    return NUMBER(1);
+    // return eval();
 }
 
 EvaValue EvaVM::eval() {

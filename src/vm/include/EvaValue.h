@@ -103,12 +103,29 @@ struct CodeObject : public Object {
     size_t scopeLevel = 0;
     std::vector<LocalVar> locals;
 
-    inline int getLocalIndex(const std::string& name) {
+    std::vector<std::string> cellNames;
+
+    size_t freeCount = 0;
+
+    inline int getLocalIndex(const std::string& name) const {
         if (locals.size() > 0) {
             // have to go from behind to get the newest stack value
             for (auto itr = locals.rbegin(); itr != locals.rend(); ++itr) {
                 if (itr->name == name) {
                     return std::distance(itr, locals.rend()) - 1;
+                }
+            }
+        }
+
+        return -1;
+    };
+
+    inline int getCellIndex(const std::string& name) const {
+        if (cellNames.size() > 0) {
+            // have to go from behind to get the newest stack value
+            for (auto itr = cellNames.rbegin(); itr != cellNames.rend(); ++itr) {
+                if (*itr == name) {
+                    return std::distance(itr, cellNames.rend()) - 1;
                 }
             }
         }
@@ -169,8 +186,7 @@ struct FunctionObject : public Object {
 #define IS_NATIVE(fnValue) IS_OBJECT_TYPE(fnValue, ObjectType::NATIVE)
 #define IS_FUNCTION(fnValue) IS_OBJECT_TYPE(fnValue, ObjectType::FUNCTION)
 
-inline std::string
-evaValueToTypeString(const EvaValue& evaValue) {
+inline std::string evaValueToTypeString(const EvaValue& evaValue) {
     if (IS_NUMBER(evaValue)) {
         return "NUMBER";
     } else if (IS_BOOLEAN(evaValue)) {

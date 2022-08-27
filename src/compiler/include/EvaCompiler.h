@@ -37,6 +37,21 @@
     emit(exp.list.size() - 1);
 
 // optimazied
+/**
+    * @brief
+    * if (isGlobalScope()) {
+        global->define(varName);
+        emit(OP_SET_GLOBAL);
+        emit(global->getGlobalIndex(varName));
+    } else {
+        co->addLocal(varName);  // add local to count the position
+
+        //-------------------
+        // initializer is already in the right position
+        // emit(OP_SET_LOCAL);
+        // emit(co->getLocalIndex(varName));
+    }
+ */
 #define SAVE_AS_GLOBAL_OR_LOCAL(name)       \
     if (isGlobalScope()) {                  \
         global->define(name);               \
@@ -57,8 +72,8 @@ class EvaCompiler {
     void writeByteOffset(size_t offset, uint8_t value);
     std::shared_ptr<Global> global;
     std::unique_ptr<EvaDisassembler> disassembler;
-    void scopeEnter();
-    void scopeExit();
+    void blockEnter();
+    void blockExit();
     bool isGlobalScope() const;
     bool isFunctionBody() const;
     bool isBlock(const Exp& exp) const;
@@ -78,7 +93,12 @@ class EvaCompiler {
                          const Exp& body);
     void analyze(const Exp& exp,
                  std::shared_ptr<Scope> scope);
+
+    // scope info
     std::map<const Exp*, std::shared_ptr<Scope>> scopeInfo_;
+    std::stack<std::shared_ptr<Scope>> scopeStack_;
+    void getNameGetter(const std::string& name);
+    void getNameSetter(const std::string& name);
 
    public:
     EvaCompiler(std::shared_ptr<Global> global)

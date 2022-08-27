@@ -6,6 +6,7 @@
 #include <set>
 #include <string>
 
+#include "../../byteCode/include/OpCode.h"
 #include "../../logger/include/Logger.h"
 
 enum class ScopeType {
@@ -33,6 +34,10 @@ struct Scope {
     void maybePromote(const std::string& name);
 
     void promote(const std::string& name, Scope* ownerScope);
+
+    uint8_t getNameGetter(const std::string& name);
+
+    uint8_t getNameSetter(const std::string& name);
 
     std::pair<Scope*, AllocType> resolve(
         const std::string& name,
