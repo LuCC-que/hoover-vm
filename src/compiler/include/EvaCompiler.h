@@ -9,6 +9,7 @@
 #include "../../logger/include/Logger.h"
 #include "../../parser/include/EvaParser.h"
 #include "../../vm/include/EvaValue.h"
+#include "Scope.h"
 
 #define ALLOC_CONST(tester, converter, allocator, value)                        \
     for (auto itr = co->constants.begin(); itr != co->constants.end(); ++itr) { \
@@ -75,6 +76,9 @@ class EvaCompiler {
                          const std::string fnName,
                          const Exp& params,
                          const Exp& body);
+    void analyze(const Exp& exp,
+                 std::shared_ptr<Scope> scope);
+    std::map<const Exp*, std::shared_ptr<Scope>> scopeInfo_;
 
    public:
     EvaCompiler(std::shared_ptr<Global> global)
