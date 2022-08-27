@@ -7,32 +7,19 @@
 int main(int argc, char const *argv[]) {
     EvaVM vm;
     auto result = vm.exec(R"(
-        // (var adder (lambda (x) (+ x x)))
-        // (def factorial (x)
-        //     (if (== x 1)
-        //         1
-        //         (* x (factorial (- x 1)))))
-        
-        // (factorial 5)
-        // //IIIE
-        // (adder 2)
-
-        (var x 10)
-        (def foo() x)
-        // (var y (+ x 1))
-
-        (begin
-            (var y 100)
-            (var q 300)
-            q
-            (+ y x)
-            (begin 
-                (var z 200)
-                z
-                (def bar () (+ y z))
-                (bar)
+        (def createCounter()
+            (begin
+                (var value 0)
+                (def inc () (set value (+ value 1)))
+                inc
             )
         )
+        
+        (var fn1 (createCounter))
+        (var fn2 (createCounter))
+
+        (fn1)
+        (fn2)
         
    )");
 

@@ -26,6 +26,10 @@ void Scope::maybePromote(const std::string& name) {
         initAllocType = allocInfo[name];
     }
 
+    if (initAllocType == AllocType::CELL) {
+        return;
+    }
+
     auto [ownerScope, allocType] = resolve(name, initAllocType);
 
     allocInfo[name] = allocType;

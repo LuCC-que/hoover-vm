@@ -309,6 +309,7 @@ void EvaCompiler::gen(const Exp& exp) {
                         }
                         default: {
                             co->addLocal(varName);
+                            break;
                         }
                     }
 
@@ -620,13 +621,27 @@ void EvaCompiler::compileFunction(const Exp& exp,
 
     emit(OP_RETURN);
 
-    // add the function as constant
-    auto fn = ALLOC_FUNCTION(co);  // encapusalte
-    co = prevCo;                   // recover
-    co->addConst(fn);
+    if (scopeInfo->free.size() == 0) {
+        // add the function as constant
+        auto fn = ALLOC_FUNCTION(co);  // encapusalte
+        co = prevCo;                   // recover
+        co->addConst(fn);
 
-    emit(OP_CONST);
-    emit(co->constants.size() - 1);
+        emit(OP_CONST);
+        emit(co->constants.size() - 1);
+    } else {
+        co = prevCo;
+        for (const auto& freeVar : scopeInfo->free) {
+            emit(OP_LOAD_CELL);
+            emit(prevCo->getCellIndex(freeVar));
+        }
+
+        emit(OP_CONST);
+        emit(co->constants.size() - 1);
+
+        emit(OP_MAKE_FUNCTION);
+        emit(scopeInfo->free.size());
+    }
 
     scopeStack_.pop();
 }

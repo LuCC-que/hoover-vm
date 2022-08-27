@@ -49,7 +49,10 @@ size_t EvaDisassembler::disassembleInstruction(CodeObject* co, size_t offset) {
             return disassembleLocal(co, opcode, offset);
         case OP_GET_CELL:
         case OP_SET_CELL:
+        case OP_LOAD_CELL:
             return disassembleCell(co, opcode, offset);
+        case OP_MAKE_FUNCTION:
+            return disassembleMakeFunction(co, opcode, offset);
         default:
             DIE << "disassembleInstruction: no disassembly for" << opcodeToString(opcode);
     }
@@ -148,6 +151,12 @@ size_t EvaDisassembler::disassembleCell(CodeObject* co, uint8_t opcode, size_t o
               << ")";
 
     return offset + 2;
+}
+
+size_t EvaDisassembler::disassembleMakeFunction(CodeObject* co,
+                                                uint8_t opcode,
+                                                size_t offset) {
+    return disassembleWord(co, opcode, offset);
 }
 
 uint16_t EvaDisassembler::readWordAtOffset(CodeObject* co, size_t offset) {

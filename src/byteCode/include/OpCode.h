@@ -52,6 +52,10 @@
 
 #define OP_SET_CELL 0x18
 
+#define OP_LOAD_CELL 0x19
+
+#define OP_MAKE_FUNCTION 0x20
+
 //#op -> string var
 //##op -> connect var name to others
 #define OP_STR(op) \
@@ -79,6 +83,8 @@ inline std::string opcodeToString(uint8_t opcode) {
         OP_STR(RETURN);
         OP_STR(GET_CELL);
         OP_STR(SET_CELL);
+        OP_STR(LOAD_CELL);
+        OP_STR(MAKE_FUNCTION);
         default:
             DIE << "opcodeToString: Unknown opcode: " << (int)opcode;
     }
