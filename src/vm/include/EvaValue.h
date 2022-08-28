@@ -2,6 +2,8 @@
 #define EvaValue_h
 
 #include <functional>
+#include <iostream>
+#include <list>
 #include <string>
 #include <vector>
 
@@ -28,12 +30,59 @@ enum class ObjectType {
     CELL,
 };
 
+struct Traceable {
+    bool marked;
+    size_t size;
+    static void* operator new(size_t size) {
+        void* object = ::operator new(size);
+        ((Traceable*)object)->size = size;
+
+        Traceable::objects.push_back((Traceable*)object);
+        Traceable::bytesAllocated += size;
+
+        return object;
+    }
+
+    static void operator delete(void* object, std::size_t sz) {
+        Traceable::bytesAllocated -= ((Traceable*)object)->size;
+        ::operator delete(object, sz);
+    }
+
+    static void cleanup() {
+        for (auto& object : objects) {
+            delete object;
+        }
+        objects.clear();
+    }
+
+    static void printStats() {
+        std::cout << "---------------------\n";
+        std::cout << "Memory stats:\n\n";
+        std::cout << "Objects allocated : "
+                  << std::dec
+                  << Traceable::objects.size()
+                  << std::endl;
+        std::cout << "Bytes allocated : "
+                  << std::dec
+                  << Traceable::bytesAllocated
+                  << std::endl
+                  << std::endl;
+    }
+
+    static size_t bytesAllocated;
+    static std::list<Traceable*> objects;
+};
+
+// // initialize
+inline size_t Traceable::bytesAllocated{0};
+inline std::list<Traceable*> Traceable::objects{};
+
 /**
  * @brief
  * Base object
  */
 
-struct Object {
+struct Object : public Traceable {
     Object(ObjectType type)
         : type(type) {}
     ObjectType type;

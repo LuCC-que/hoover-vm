@@ -36,6 +36,7 @@ EvaValue EvaVM::exec(const std::string &program) {
 
 EvaValue EvaVM::eval() {
     for (;;) {
+        maybeGC();
         auto opcode = READ_BYTE();
         DebugDumpStack(opcode);
         switch (opcode) {
@@ -60,7 +61,7 @@ EvaValue EvaVM::eval() {
                 } else if (IS_STRING(op1) && IS_STRING(op2)) {
                     auto s1 = AS_CPPSTRING(op1);
                     auto s2 = AS_CPPSTRING(op2);
-                    push(ALLOC_STRING(s1 + s2));
+                    push(MEM(ALLOC_STRING, s1 + s2));
                 }
                 break;
             }
@@ -173,7 +174,7 @@ EvaValue EvaVM::eval() {
                 auto value = peek(0);
 
                 if (fn->cells.size() <= cellIndex) {
-                    fn->cells.push_back(AS_CELL(ALLOC_CELL(value)));
+                    fn->cells.push_back(AS_CELL(MEM(ALLOC_CELL, value)));
                 } else {
                     fn->cells[cellIndex]->value = value;
                 }
@@ -184,7 +185,7 @@ EvaValue EvaVM::eval() {
                 auto co = AS_CODE(pop());
                 auto cellsCount = READ_BYTE();
 
-                auto fnValue = ALLOC_FUNCTION(co);
+                auto fnValue = MEM(ALLOC_FUNCTION, co);
                 auto fn = AS_FUNCTION(fnValue);
 
                 for (auto i = 0; i < cellsCount; ++i) {
@@ -321,4 +322,60 @@ void EvaVM::DebugDumpStack(uint8_t op) {
     }
 
     std::cout << "\n";
+}
+
+void EvaVM::maybeGC() {
+    if (Traceable::bytesAllocated < GC_TRESHOLD) {
+        return;
+    }
+
+    auto roots = getGCRoots();
+
+    if (roots.size() == 0) {
+        return;
+    }
+
+    std::cout << "------------ Before GC Stats ------------";
+    Traceable::printStats();
+    collector->gc(roots);
+    Traceable::printStats();
+    std::cout << "------------ After GC Stats ------------";
+}
+
+std::set<Traceable *> EvaVM::getGCRoots() {
+    auto roots = getStackGCRoots();
+
+    auto constantRoots = getConstantGCRoots();
+    roots.insert(constantRoots.begin(), constantRoots.end());
+
+    auto globalRoots = getGlobalGCRoots();
+    roots.insert(globalRoots.begin(), globalRoots.end());
+
+    return roots;
+}
+
+std::set<Traceable *> EvaVM::getStackGCRoots() {
+    std::set<Traceable *> roots;
+    auto stackEntry = sp;
+    while (stackEntry-- != stack.begin()) {
+        if (IS_OBJECT(*stackEntry)) {
+            roots.insert((Traceable *)stackEntry->object);
+        }
+    }
+    return roots;
+}
+
+std::set<Traceable *> EvaVM::getGlobalGCRoots() {
+    std::set<Traceable *> roots;
+    for (const auto &global : global->globals) {
+        if (IS_OBJECT(global.value)) {
+            roots.insert((Traceable *)global.value.object);
+        }
+    }
+
+    return roots;
+}
+
+std::set<Traceable *> EvaVM::getConstantGCRoots() {
+    return compiler->getConstantObject();
 }

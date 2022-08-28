@@ -114,6 +114,9 @@ class EvaCompiler {
 
     CodeObject* co;
     std::vector<CodeObject*> codeObjects_;
+    std::set<Traceable*>& getConstantObject();
+
+    std::set<Traceable*> constantObjects_;
 };
 
 static std::map<std::string, uint8_t> compareOps_{

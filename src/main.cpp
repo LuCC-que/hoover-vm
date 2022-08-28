@@ -5,27 +5,30 @@
 #include "Logger.h"
 
 int main(int argc, char const *argv[]) {
-    EvaVM vm;
-    auto result = vm.exec(R"(
-        (def createCounter()
-            (begin
-                (var value 0)
-                (def inc () (set value (+ value 1)))
-                inc
-            )
-        )
-        
-        (var fn1 (createCounter))
-        (var fn2 (createCounter))
+    {
+        EvaVM vm;
+        Traceable::printStats();
+        auto result = vm.exec(R"(
 
-        (fn1)
-        (fn2)
-        
+        (+ "hello" "string")
+
    )");
 
-    vm.DebugDumpStack(0);
-    std::cout << std::endl;
-    log(result);
+        //     vm.exec(R"(
+
+        //     (+ "hello" "string")
+
+        // )");
+
+        vm.DebugDumpStack(0);
+        std::cout << std::endl;
+        log(result);
+
+        Traceable::printStats();
+    }
+
+    Traceable::printStats();
+
     std::cout << std::endl;
     std::cout << "all passed!" << std::endl;
     return 0;

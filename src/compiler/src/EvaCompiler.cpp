@@ -4,6 +4,8 @@ void EvaCompiler::compile(const Exp& exp) {
     co = AS_CODE(creatCodeObjectValue("main"));
     main = AS_FUNCTION(ALLOC_FUNCTION(co));
 
+    constantObjects_.insert((Traceable*)main);
+
     analyze(exp, nullptr);
     gen(exp);
     emit(OP_HALT);
@@ -465,6 +467,7 @@ size_t EvaCompiler::numericConstIdx(const double value) {
 
 size_t EvaCompiler::stringConstIdx(const std::string& value) {
     ALLOC_CONST(IS_STRING, AS_CPPSTRING, ALLOC_STRING, value);
+    constantObjects_.insert((Traceable*)co->constants.back().object);
     return co->constants.size() - 1;
 }
 
@@ -552,7 +555,13 @@ EvaValue EvaCompiler::creatCodeObjectValue(const std::string& name, size_t arity
     auto co = AS_CODE(coValue);
 
     codeObjects_.push_back(co);
+
+    constantObjects_.insert((Traceable*)co);
     return coValue;
+}
+
+std::set<Traceable*>& EvaCompiler::getConstantObject() {
+    return constantObjects_;
 }
 
 FunctionObject* EvaCompiler::getMainFunction() { return main; }
@@ -624,7 +633,10 @@ void EvaCompiler::compileFunction(const Exp& exp,
     if (scopeInfo->free.size() == 0) {
         // add the function as constant
         auto fn = ALLOC_FUNCTION(co);  // encapusalte
-        co = prevCo;                   // recover
+
+        constantObjects_.insert((Traceable*)AS_OBJECT(fn));
+
+        co = prevCo;  // recover
         co->addConst(fn);
 
         emit(OP_CONST);

@@ -19,6 +19,7 @@
 
 #include "../../compiler/include/EvaCompiler.h"
 #include "../../parser/include/EvaParser.h"
+#include "EvaCollector.h"
 #include "EvaValue.h"
 #include "Global.h"
 using syntax::EvaParser;
@@ -28,6 +29,11 @@ using syntax::EvaParser;
 #define GET_CONST() fn->co->constants[READ_BYTE()]
 #define READ_SHORT() (ip += 2, (uint16_t)((ip[-2] << 8) | ip[-1]))
 #define TO_ADDRESS(index) &fn->co->code[index]
+
+#define MEM(allocator, ...) (maybeGC(), allocator(__VA_ARGS__))
+
+#define STACK_LIMIT 512
+#define GC_TRESHOLD 512
 
 #define BINARY_OP(op)                \
     do {                             \
@@ -82,13 +88,21 @@ struct Frame {
 class EvaVM {
    private:
     /* data */
+    std::set<Traceable *> getGCRoots();
+    std::set<Traceable *> getStackGCRoots();
+    std::set<Traceable *> getConstantGCRoots();
+    std::set<Traceable *> getGlobalGCRoots();
+
    public:
     EvaVM(/* args */)
         : global(std::make_shared<Global>()),
           parser(std::make_unique<EvaParser>()),
-          compiler(std::make_unique<EvaCompiler>(global)) {
+          compiler(std::make_unique<EvaCompiler>(global)),
+          collector(std::make_unique<EvaCollector>()) {
         setGlobalVariables();
     };
+
+    ~EvaVM() { Traceable::cleanup(); };
 
     /**
      * @brief
@@ -112,6 +126,8 @@ class EvaVM {
     EvaValue pop();
 
     void popN(size_t count);
+
+    void maybeGC();
 
     // the start
     EvaValue exec(const std::string &program);
@@ -170,6 +186,8 @@ class EvaVM {
     std::unique_ptr<EvaParser> parser;
 
     std::unique_ptr<EvaCompiler> compiler;
+
+    std::unique_ptr<EvaCollector> collector;
 
     FunctionObject *fn;
 
