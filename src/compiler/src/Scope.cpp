@@ -76,8 +76,8 @@ std::pair<Scope*, AllocType> Scope::resolve(
 //              std::map<const Exp*, std::shared_ptr<Scope>>& scopeInfo_) {
 // }
 
-uint8_t Scope::getNameGetter(const std::string& name) {
-    switch (allocInfo[name]) {
+uint8_t Scope::getNameGetter(const std::string& name) const {
+    switch (allocInfo.at(name)) {
         case AllocType::GLOBAL:
             /* code */
             return OP_GET_GLOBAL;
@@ -90,8 +90,8 @@ uint8_t Scope::getNameGetter(const std::string& name) {
     return -1;
 }
 
-uint8_t Scope::getNameSetter(const std::string& name) {
-    switch (allocInfo[name]) {
+uint8_t Scope::getNameSetter(const std::string& name) const {
+    switch (allocInfo.at(name)) {
         case AllocType::GLOBAL:
             /* code */
             return OP_SET_GLOBAL;

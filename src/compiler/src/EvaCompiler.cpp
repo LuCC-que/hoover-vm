@@ -11,11 +11,15 @@ void EvaCompiler::compile(const Exp& exp) {
     emit(OP_HALT);
 }
 
+//-------------------------------------------------------------------------------
+//----------------------------Scope analyze--------------------------------------
+//-------------------------------------------------------------------------------
+
 void EvaCompiler::analyze(const Exp& exp,
                           std::shared_ptr<Scope> scope) {
     switch (exp.type) {
         case ExpType::SYMBOL: {
-            if (exp.string == "true" || exp.string == "false") {
+            if (exp.string == "true" || exp.string == "false" || exp.string == "null") {
                 // do nothing
             } else {
                 scope->maybePromote(exp.string);
@@ -76,7 +80,25 @@ void EvaCompiler::analyze(const Exp& exp,
                     }
 
                     analyze(exp.list[2], newScope);
-                } else {
+                } else if (op == "class") {
+                    auto className = exp.list[1].string;
+                    auto newScope = std::make_shared<Scope>(ScopeType::CLASS, scope);
+                    scopeInfo_[&exp] = newScope;
+
+                    scope->addLocal(className);
+
+                    for (auto i = 3; i < exp.list.size(); ++i) {
+                        analyze(exp.list[i], newScope);
+                    }
+                }
+
+                //--------------------------------------------------------
+                // property access:
+                else if (op == "prop") {
+                    analyze(exp.list[1], scope);
+                }
+
+                else {
                     // binary
                     for (auto i = 1; i < exp.list.size(); ++i) {
                         analyze(exp.list[i], scope);
@@ -92,6 +114,9 @@ void EvaCompiler::analyze(const Exp& exp,
     }
 }
 
+//-------------------------------------------------------------------------------
+//-------------------------------Code gen----------------------------------------
+//-------------------------------------------------------------------------------
 void EvaCompiler::gen(const Exp& exp) {
     switch (exp.type) {
             //---------------------------
@@ -322,39 +347,55 @@ void EvaCompiler::gen(const Exp& exp) {
                     // }
 
                 }
+                //------------------------------------------------------
+                // Variable update: (set x 100)
+                // property update: (set (prop self "x") 100)
 
                 else if (op == "set") {
-                    const auto varName = exp.list[1].string;
+                    //-----------------
+                    // properites
+                    if (isProp(exp.list[1])) {
+                        gen(exp.list[2]);          // value
+                        gen(exp.list[1].list[1]);  // instance
 
-                    auto opCodeSetter = scopeStack_.top()->getNameSetter(varName);
+                        emit(OP_SET_PROP);  // property name
+                        emit(stringConstIdx(exp.list[1].list[2].string));
+                    }
+                    //-----------------
+                    // variable setting
+                    else {
+                        const auto varName = exp.list[1].string;
 
-                    /**
-                     * @brief
-                     * the result will always put to the top of stack
-                     * if it is constant, CONST IDX
-                     * it it is expression, CONST L CONST R OP
-                     */
-                    gen(exp.list[2]);
+                        const auto opCodeSetter = scopeStack_.top()->getNameSetter(varName);
 
-                    switch (opCodeSetter) {
-                        case OP_SET_LOCAL: {
-                            emit(OP_SET_LOCAL);
-                            emit(co->getLocalIndex(varName));
-                            break;
-                        }
-                        case OP_SET_CELL: {
-                            emit(OP_SET_CELL);
-                            emit(co->getCellIndex(varName));
-                            break;
-                        }
-                        default: {
-                            auto globalIndex = global->getGlobalIndex(varName);
-                            if (globalIndex == -1) {
-                                DIE << "Reference Error: " << varName << " is not defined.";
+                        /**
+                         * @brief
+                         * the result will always put to the top of stack
+                         * if it is constant, CONST IDX
+                         * it it is expression, CONST L CONST R OP
+                         */
+                        gen(exp.list[2]);
+
+                        switch (opCodeSetter) {
+                            case OP_SET_LOCAL: {
+                                emit(OP_SET_LOCAL);
+                                emit(co->getLocalIndex(varName));
+                                break;
                             }
-                            emit(OP_SET_GLOBAL);
-                            emit(globalIndex);
-                            break;
+                            case OP_SET_CELL: {
+                                emit(OP_SET_CELL);
+                                emit(co->getCellIndex(varName));
+                                break;
+                            }
+                            default: {
+                                auto globalIndex = global->getGlobalIndex(varName);
+                                if (globalIndex == -1) {
+                                    DIE << "Reference Error: " << varName << " is not defined.";
+                                }
+                                emit(OP_SET_GLOBAL);
+                                emit(globalIndex);
+                                break;
+                            }
                         }
                     }
 
@@ -369,8 +410,7 @@ void EvaCompiler::gen(const Exp& exp) {
                         // auto isLocalDeclaration =
                         //     isDeclaration(exp.list[i]) && !isGlobalScope();
 
-                        bool isDecl = isFuncDeclaration(exp.list[i]) ||
-                                      isDeclaration(exp.list[i]);
+                        bool isDecl = isDeclaration(exp.list[i]);
                         gen(exp.list[i]);
 
                         // Global var already has the val
@@ -415,7 +455,15 @@ void EvaCompiler::gen(const Exp& exp) {
                     }
                      */
 
-                    SAVE_AS_GLOBAL_OR_LOCAL(fnName)
+                    if (classObject_ == nullptr) {
+                        if (isGlobalScope()) {
+                            global->define(fnName);
+                            emit(OP_SET_GLOBAL);
+                            emit(global->getGlobalIndex(fnName));
+                        } else {
+                            co->addLocal(fnName);
+                        }
+                    }
 
                 } else if (op == "lambda") {
                     //
@@ -424,6 +472,86 @@ void EvaCompiler::gen(const Exp& exp) {
                         /*name*/ "lambda",
                         /*params*/ exp.list[1],
                         /*body*/ exp.list[2]);
+                }
+
+                else if (op == "class") {
+                    auto name = exp.list[1].string;
+
+                    auto superClass = exp.list[2].string == "null"
+                                          ? nullptr
+                                          : getClassByName(exp.list[2].string);
+
+                    auto cls = ALLOC_CLASS(name, superClass);
+                    auto classObject = AS_CLASS(cls);
+
+                    classObjects_.push_back(classObject);
+
+                    constantObjects_.insert((Traceable*)classObject);
+
+                    // put the class in the constant pool:
+                    co->addConst(cls);
+
+                    // set as global:
+                    global->define(name);
+
+                    // opt we can actually set the class to global at compile time
+                    global->set(global->getGlobalIndex(name), cls);
+                    //  emit(OP_SET_GLOBAL);
+                    //  emit(global->getGlobalIndex(name));
+
+                    if (exp.list.size() > 3) {
+                        auto prevClassObject = classObject_;
+                        classObject_ = classObject;
+
+                        scopeStack_.push(scopeInfo_.at(&exp));
+                        for (auto i = 3; i < exp.list.size(); ++i) {
+                            gen(exp.list[i]);
+                        }
+                        scopeStack_.pop();
+
+                        classObject_ = prevClassObject;
+                    }
+
+                } else if (op == "new") {
+                    auto className = exp.list[1].string;
+                    auto cls = getClassByName(className);
+
+                    if (cls == nullptr) {
+                        DIE << "[EvaCompiler]: Unknown class " << cls;
+                    }
+
+                    emit(OP_GET_GLOBAL);
+                    emit(global->getGlobalIndex(className));
+
+                    emit(OP_NEW);
+
+                    for (auto i = 2; i < exp.list.size(); ++i) {
+                        gen(exp.list[i]);
+                    }
+
+                    emit(OP_CALL);
+                    emit(AS_FUNCTION(cls->getProp("constructor"))->co->arity);
+                } else if (op == "prop") {
+                    gen(exp.list[1]);
+                    emit(OP_GET_PROP);
+                    emit(stringConstIdx(exp.list[2].string));
+                } else if (op == "super") {
+                    const auto className = exp.list[1].string;
+                    const auto cls = getClassByName(className);
+
+                    if (cls == nullptr) {
+                        DIE << "[EvaCompiler]: Unknown class "
+                            << cls;
+                    }
+
+                    if (cls->superClass == nullptr) {
+                        DIE << "[EvaCompiler]: Class "
+                            << cls->name
+                            << " doesn't have super class";
+                    }
+
+                    emit(OP_GET_GLOBAL);
+                    emit(global->getGlobalIndex(cls->superClass->name));
                 }
                 //------------------------------
                 // Function calls:
@@ -509,7 +637,11 @@ bool EvaCompiler::isFunctionBody() const {
 }
 
 bool EvaCompiler::isDeclaration(const Exp& exp) const {
-    return isVarDeclaration(exp);
+    return isVarDeclaration(exp) || isFuncDeclaration(exp) || isClassDeclaration(exp);
+}
+
+bool EvaCompiler::isClassDeclaration(const Exp& exp) const {
+    return isTaggedList(exp, "class");
 }
 
 bool EvaCompiler::isVarDeclaration(const Exp& exp) const {
@@ -533,6 +665,10 @@ bool EvaCompiler::isLambdaDeclaration(const Exp& exp) const {
 
 bool EvaCompiler::isFuncDeclaration(const Exp& exp) const {
     return isTaggedList(exp, "def");
+}
+
+bool EvaCompiler::isProp(const Exp& exp) const {
+    return isTaggedList(exp, "prop");
 }
 
 size_t EvaCompiler::getVarsCountOnScopeExit() {
@@ -564,7 +700,16 @@ std::set<Traceable*>& EvaCompiler::getConstantObject() {
     return constantObjects_;
 }
 
-FunctionObject* EvaCompiler::getMainFunction() { return main; }
+FunctionObject* EvaCompiler::getMainFunction() const { return main; }
+
+ClassObject* EvaCompiler::getClassByName(const std::string& name) const {
+    for (const auto& classObject : classObjects_) {
+        if (classObject->name == name) {
+            return classObject;
+        }
+    }
+    return nullptr;
+}
 
 void EvaCompiler::compileFunction(const Exp& exp,
                                   const std::string fnName,
@@ -579,7 +724,10 @@ void EvaCompiler::compileFunction(const Exp& exp,
     auto prevCo = co;
 
     // function code object:
-    auto coValue = creatCodeObjectValue(fnName, arity);
+    auto coValue = creatCodeObjectValue(classObject_ != nullptr
+                                            ? (classObject_->name + "." + fnName)
+                                            : fnName,
+                                        arity);
     co = AS_CODE(coValue);
 
     // if (scopeInfo->scopeType != ScopeType::GLOBAL) {
@@ -621,7 +769,10 @@ void EvaCompiler::compileFunction(const Exp& exp,
 
     // compile body in the new code object:
     // code has been changed above
+    auto prevClassObject = classObject_;
+    classObject_ = nullptr;
     gen(body);
+    classObject_ = prevClassObject;
 
     if (!isBlock(body)) {
         emit(OP_SCOPE_EXIT);
@@ -630,7 +781,14 @@ void EvaCompiler::compileFunction(const Exp& exp,
 
     emit(OP_RETURN);
 
-    if (scopeInfo->free.size() == 0) {
+    if (classObject_ != nullptr) {
+        auto fn = ALLOC_FUNCTION(co);
+        constantObjects_.insert((Traceable*)AS_OBJECT(fn));
+        co = prevCo;
+        classObject_->properties[fnName] = fn;
+    }
+
+    else if (scopeInfo->free.size() == 0) {
         // add the function as constant
         auto fn = ALLOC_FUNCTION(co);  // encapusalte
 

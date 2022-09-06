@@ -4,6 +4,7 @@
 #include <functional>
 #include <iostream>
 #include <list>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -28,6 +29,8 @@ enum class ObjectType {
     NATIVE,
     FUNCTION,
     CELL,
+    CLASS,
+    INSTANCE,
 };
 
 struct Traceable {
@@ -88,6 +91,48 @@ struct Object : public Traceable {
     ObjectType type;
 };
 
+struct EvaValue {
+    EvaValueType type;
+
+    // only one type of it
+    union {
+        double number;
+        bool boolean;
+        Object* object;
+    };
+};
+
+// class obejct
+struct ClassObject : public Object {
+    ClassObject(const std::string& name, ClassObject* superClass)
+        : Object(ObjectType::CLASS),
+          name(name),
+          properties{},
+          superClass(superClass) {
+    }
+    std::string name;
+
+    std::map<std::string, EvaValue> properties;
+
+    ClassObject* superClass;
+
+    inline EvaValue getProp(const std::string& prop) {
+        if (properties.count(prop) != 0) {
+            return properties[prop];
+        }
+
+        if (superClass == nullptr) {
+            DIE << "Unresolved property " << prop << " in class " << name;
+        }
+
+        return superClass->getProp(prop);
+    }
+
+    inline void setProp(const std::string& prop, const EvaValue& value) {
+        properties[prop] = value;
+    }
+};
+
 /**
  * @brief
  * String object
@@ -122,18 +167,27 @@ struct NativeObject : public Object {
  * Eva value (tagged union)
  *
  */
-struct EvaValue {
-    EvaValueType type;
-    union {
-        double number;
-        bool boolean;
-        Object* object;
-    };
-};
 
 struct LocalVar {
     std::string name;
     size_t scopeLevel;
+};
+
+struct InstanceObject : public Object {
+    InstanceObject(ClassObject* cls)
+        : Object(ObjectType::INSTANCE),
+          cls(cls),
+          properties{} {}
+
+    ClassObject* cls;
+    std::map<std::string, EvaValue> properties;
+
+    EvaValue getProp(const std::string& prop) {
+        if (properties.count(prop) != 0) {
+            return properties[prop];
+        }
+        return cls->getProp(prop);
+    }
 };
 
 /**
@@ -226,8 +280,15 @@ struct FunctionObject : public Object {
 
 #define ALLOC_FUNCTION(co) \
     ((EvaValue){EvaValueType::OBJECT, .object = (Object*)new FunctionObject(co)})
+#define ALLOC_CLASS(name, superClass) \
+    ((EvaValue){EvaValueType::OBJECT, \
+                .object = (Object*)new ClassObject(name, superClass)})
+
+#define ALLOC_INSTANCE(cls) \
+    ((EvaValue){EvaValueType::OBJECT, .object = (Object*)new InstanceObject(cls)})
 
 #define CELL(cellObject) OBJECT((Object*)cellObject)
+#define CLASS(classObject) OBJECT((Object*)classObject)
 //------------------------------
 // converter
 #define AS_NUMBER(evaValue) ((double)(evaValue).number)  // return the number
@@ -239,6 +300,8 @@ struct FunctionObject : public Object {
 #define AS_FUNCTION(evaValue) ((FunctionObject*)(evaValue).object)
 #define AS_CPPSTRING(evaValue) (AS_STRING(evaValue)->string)  // return the string
 #define AS_CELL(evaValue) ((CellObject*)(evaValue).object)    // return the string
+#define AS_CLASS(evaValue) ((ClassObject*)(evaValue).object)
+#define AS_INSTANCE(evaValue) ((InstanceObject*)(evaValue).object)
 //-------------------------------
 // Testers:
 #define IS_NUMBER(evaValue) ((evaValue).type == EvaValueType::NUMBER)
@@ -251,6 +314,8 @@ struct FunctionObject : public Object {
 #define IS_NATIVE(fnValue) IS_OBJECT_TYPE(fnValue, ObjectType::NATIVE)
 #define IS_FUNCTION(fnValue) IS_OBJECT_TYPE(fnValue, ObjectType::FUNCTION)
 #define IS_CELL(evaValue) IS_OBJECT_TYPE(evaValue, ObjectType::CELL)
+#define IS_CLASS(evaValue) IS_OBJECT_TYPE(evaValue, ObjectType::CLASS)
+#define IS_INSTANCE(evaValue) IS_OBJECT_TYPE(evaValue, ObjectType::INSTANCE)
 
 inline std::string evaValueToTypeString(const EvaValue& evaValue) {
     if (IS_NUMBER(evaValue)) {
@@ -267,6 +332,10 @@ inline std::string evaValueToTypeString(const EvaValue& evaValue) {
         return "FUNCTION";
     } else if (IS_CELL(evaValue)) {
         return "CELL";
+    } else if (IS_CLASS(evaValue)) {
+        return "CLASS";
+    } else if (IS_INSTANCE(evaValue)) {
+        return "INSTANCE";
     } else {
         DIE << "evaValueToTypeString: Unknown type" << (int)evaValue.type;
     }
@@ -293,6 +362,12 @@ inline std::string evaValueToConstantString(const EvaValue& evaValue) {
     } else if (IS_CELL(evaValue)) {
         auto cell = AS_CELL(evaValue);
         ss << "cell: " << evaValueToConstantString(cell->value);
+    } else if (IS_CLASS(evaValue)) {
+        auto cls = AS_CLASS(evaValue);
+        ss << "class: " << cls->name;
+    } else if (IS_INSTANCE(evaValue)) {
+        auto instance = AS_INSTANCE(evaValue);
+        ss << "instance: " << instance->cls->name;
     } else {
         DIE << "evaValueToConstantString: unknown type " << (int)evaValue.type;
     }

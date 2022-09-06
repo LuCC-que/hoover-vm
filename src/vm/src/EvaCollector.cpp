@@ -23,14 +23,25 @@ void EvaCollector::mark(const std::set<Traceable *> &roots) {
 
 std::set<Traceable *> EvaCollector::getPointers(const Traceable *object) {
     std::set<Traceable *> pointers;
-    auto evaValue = OBJECT((Object *)object);
+    const auto evaValue = OBJECT((Object *)object);
 
     if (IS_FUNCTION(evaValue)) {
-        auto fn = AS_FUNCTION(evaValue);
+        const auto fn = AS_FUNCTION(evaValue);
         for (auto &cell : fn->cells) {
             pointers.insert((Traceable *)cell);
         }
     }
+
+    if (IS_INSTANCE(evaValue)) {
+        auto instance = AS_INSTANCE(evaValue);
+        for (const auto &prop : instance->properties) {
+            if (IS_OBJECT(prop.second)) {
+                pointers.insert((Traceable *)AS_OBJECT(prop.second));
+            }
+        }
+    }
+
+    return pointers;
 }
 
 void EvaCollector::sweep() {

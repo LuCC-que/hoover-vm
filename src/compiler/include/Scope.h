@@ -13,6 +13,7 @@ enum class ScopeType {
     GLOBAL,
     FUNCTION,
     BLOCK,
+    CLASS,
 };
 
 enum class AllocType {
@@ -35,9 +36,9 @@ struct Scope {
 
     void promote(const std::string& name, Scope* ownerScope);
 
-    uint8_t getNameGetter(const std::string& name);
+    uint8_t getNameGetter(const std::string& name) const;
 
-    uint8_t getNameSetter(const std::string& name);
+    uint8_t getNameSetter(const std::string& name) const;
 
     std::pair<Scope*, AllocType> resolve(
         const std::string& name,

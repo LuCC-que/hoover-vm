@@ -83,6 +83,8 @@ class EvaCompiler {
     bool isTaggedList(const Exp& exp,
                       const std::string& tag) const;
     bool isLambdaDeclaration(const Exp& exp) const;
+    bool isClassDeclaration(const Exp& exp) const;
+    bool isProp(const Exp& exp) const;
     size_t getVarsCountOnScopeExit();
     EvaValue creatCodeObjectValue(const std::string& name, size_t arity = 0);
 
@@ -97,8 +99,9 @@ class EvaCompiler {
     // scope info
     std::map<const Exp*, std::shared_ptr<Scope>> scopeInfo_;
     std::stack<std::shared_ptr<Scope>> scopeStack_;
-    void getNameGetter(const std::string& name);
-    void getNameSetter(const std::string& name);
+    // void getNameGetter(const std::string& name);
+    // void getNameSetter(const std::string& name);
+    ClassObject* getClassByName(const std::string& name) const;
 
    public:
     EvaCompiler(std::shared_ptr<Global> global)
@@ -110,12 +113,13 @@ class EvaCompiler {
     void compile(const Exp& exp);
 
     void gen(const Exp& exp);
-    FunctionObject* getMainFunction();
+    FunctionObject* getMainFunction() const;
 
     CodeObject* co;
     std::vector<CodeObject*> codeObjects_;
     std::set<Traceable*>& getConstantObject();
-
+    std::vector<ClassObject*> classObjects_;
+    ClassObject* classObject_;
     std::set<Traceable*> constantObjects_;
 };
 

@@ -28,6 +28,7 @@ class EvaDisassembler {
     size_t disassembleWord(CodeObject* co, uint8_t opcode, size_t offset);
     size_t disassembleCell(CodeObject* co, uint8_t opcode, size_t offset);
     size_t disassembleMakeFunction(CodeObject* co, uint8_t opcode, size_t offset);
+    size_t disassembleProperty(CodeObject* co, uint8_t opcode, size_t offset);
     void dumpBytes(CodeObject* co, size_t offset, size_t count);
     void printOpCode(uint8_t opcode);
     uint16_t readWordAtOffset(CodeObject* co, size_t offset);

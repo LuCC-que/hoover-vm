@@ -23,12 +23,13 @@ size_t EvaDisassembler::disassembleInstruction(CodeObject* co, size_t offset) {
 
     auto opcode = co->code[offset];
     switch (opcode) {
-        case OP_HALT:
         case OP_ADD:
         case OP_SUB:
         case OP_MUL:
         case OP_DIV:
         case OP_POP:
+        case OP_NEW:
+        case OP_HALT:
         case OP_RETURN:
             return disassembleSimple(co, opcode, offset);
         case OP_SCOPE_EXIT:
@@ -53,6 +54,9 @@ size_t EvaDisassembler::disassembleInstruction(CodeObject* co, size_t offset) {
             return disassembleCell(co, opcode, offset);
         case OP_MAKE_FUNCTION:
             return disassembleMakeFunction(co, opcode, offset);
+        case OP_SET_PROP:
+        case OP_GET_PROP:
+            return disassembleProperty(co, opcode, offset);
         default:
             DIE << "disassembleInstruction: no disassembly for" << opcodeToString(opcode);
     }
@@ -157,6 +161,20 @@ size_t EvaDisassembler::disassembleMakeFunction(CodeObject* co,
                                                 uint8_t opcode,
                                                 size_t offset) {
     return disassembleWord(co, opcode, offset);
+}
+
+size_t EvaDisassembler::disassembleProperty(CodeObject* co, uint8_t opcode, size_t offset) {
+    dumpBytes(co, offset, 2);
+    printOpCode(opcode);
+
+    auto constIndex = co->code[offset + 1];
+
+    std::cout << (int)constIndex
+              << " ("
+              << AS_CPPSTRING(co->constants[constIndex])
+              << ")";
+
+    return offset + 2;
 }
 
 uint16_t EvaDisassembler::readWordAtOffset(CodeObject* co, size_t offset) {

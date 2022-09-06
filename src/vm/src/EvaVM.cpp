@@ -36,9 +36,9 @@ EvaValue EvaVM::exec(const std::string &program) {
 
 EvaValue EvaVM::eval() {
     for (;;) {
-        maybeGC();
+        // maybeGC();
         auto opcode = READ_BYTE();
-        DebugDumpStack(opcode);
+        // DebugDumpStack(opcode);
         switch (opcode) {
             case OP_HALT:
                 return pop();
@@ -246,6 +246,41 @@ EvaValue EvaVM::eval() {
                 callStack.pop();
                 break;
             }
+            case OP_NEW: {
+                auto classObject = AS_CLASS(pop());
+                auto instance = MEM(ALLOC_INSTANCE, classObject);
+
+                auto ctorValue = classObject->getProp("constructor");
+                push(ctorValue);
+
+                // add the instance
+                push(instance);
+
+                // Note: the code for constructor parameters is
+                // generated at compile time, followed by OP_CALL
+                break;
+            }
+            case OP_GET_PROP: {
+                auto prop = AS_CPPSTRING(GET_CONST());
+                auto object = pop();
+
+                if (IS_INSTANCE(object)) {
+                    push(AS_INSTANCE(object)->getProp(prop));
+                } else if (IS_CLASS(object)) {
+                    push(AS_CLASS(object)->getProp(prop));
+                } else {
+                    DIE << "[EvaVM]: Unknown object for OP_GET_PROP " << prop;
+                }
+
+                break;
+            }
+            case OP_SET_PROP: {
+                auto prop = AS_CPPSTRING(GET_CONST());
+                auto instance = AS_INSTANCE(pop());
+                auto value = pop();
+                push(instance->properties[prop] = value);
+                break;
+            }
 
             default:
                 DIE << "Unknown Opcode: " << std::hex << opcode;
@@ -338,17 +373,17 @@ void EvaVM::maybeGC() {
     std::cout << "------------ Before GC Stats ------------";
     Traceable::printStats();
     collector->gc(roots);
-    Traceable::printStats();
     std::cout << "------------ After GC Stats ------------";
+    Traceable::printStats();
 }
 
 std::set<Traceable *> EvaVM::getGCRoots() {
     auto roots = getStackGCRoots();
 
-    auto constantRoots = getConstantGCRoots();
+    const auto constantRoots = getConstantGCRoots();
     roots.insert(constantRoots.begin(), constantRoots.end());
 
-    auto globalRoots = getGlobalGCRoots();
+    const auto globalRoots = getGlobalGCRoots();
     roots.insert(globalRoots.begin(), globalRoots.end());
 
     return roots;
